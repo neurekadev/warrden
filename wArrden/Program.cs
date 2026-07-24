@@ -112,26 +112,7 @@ builder.Services.AddSingleton<SearchService>();
 builder.Services.AddSingleton<TaggingService>();
 builder.Services.AddSingleton<InstanceHealthTracker>();
 
-// One resilient HttpClient per enabled instance, keyed by InstanceKey. Each carries the
-// instance's base address + API key, an infinite HttpClient.Timeout (the resilience pipeline
-// owns per-attempt timeouts), and shared retry/backoff for transient arr failures.
-foreach (var inst in config.Instances)
-{
-    if (inst.Enabled != true) continue;
-
-    var apiKey = inst.ApiKey;
-    var baseAddress = new Uri(inst.Url.TrimEnd('/') + "/");
-
-    builder.Services.AddHttpClient(inst.InstanceKey, http =>
-        {
-            http.BaseAddress = baseAddress;
-            http.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
-            http.Timeout = Timeout.InfiniteTimeSpan;
-        })
-        .ConfigurePrimaryHttpMessageHandler(() =>
-            new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(15) })
-        .AddArrResilience(opts.HttpRetryCountValue, TimeSpan.FromSeconds(opts.HttpTimeoutSecondsValue));
-}
+builder.Services.AddArrHttpClients(config, opts);
 
 var host = builder.Build();
 
