@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-07-24
+
+### Changed
+- Show a disabled instance in the startup summary alongside its configuration, with the reason it was disabled and what to do to re-enable it.
+- Report an instance that cannot be reached at startup as a warning instead of an error, since its jobs keep retrying each cycle.
+
+### Fixed
+- Fix wArrden failing to start when every configured instance is disabled.
+
 ## [4.4.0] - 2026-07-23
 
 ### Added
@@ -199,7 +208,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cooldown system to avoid re-searching the same items too frequently
 - Support for both Radarr and Sonarr instances with independent configuration per job type
 - Structured console output with item counts, cooldown status, and result summaries
-[Unreleased]: https://code.neureka.dev/warrden/warrden/-/compare/4.4.0...HEAD
+[Unreleased]: https://code.neureka.dev/warrden/warrden/-/compare/4.5.0...HEAD
+[4.5.0]: https://code.neureka.dev/warrden/warrden/-/compare/4.4.0...4.5.0
 [4.4.0]: https://code.neureka.dev/warrden/warrden/-/compare/4.3.1...4.4.0
 
 [4.3.1]: https://code.neureka.dev/warrden/warrden/-/compare/4.3.0...4.3.1
