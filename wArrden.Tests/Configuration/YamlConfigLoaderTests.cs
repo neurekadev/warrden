@@ -2281,4 +2281,80 @@ queueCleanupRules:
         Assert.Empty(errors);
         Assert.Contains(config.Warnings, w => w.Contains("indexerFilter") && w.Contains("no include/exclude"));
     }
+
+    private static InstanceConfig SchedulableInstance(string name, bool? enabled, bool jobEnabled = true) => new()
+    {
+        Type = "sonarr",
+        Enabled = enabled,
+        Name = name,
+        Url = "http://localhost:8989",
+        ApiKey = "abc123",
+        ApiVersion = "v3",
+        QueueCleanup = new JobConfig { Enabled = jobEnabled, Cron = "*/5 * * * *" }
+    };
+
+    [Fact]
+    public void Validate_NoEnabledInstances_Warns()
+    {
+        var config = new AppConfig
+        {
+            Instances = new List<InstanceConfig>
+            {
+                SchedulableInstance("Series", false),
+                SchedulableInstance("Movies", false)
+            }
+        };
+        var errors = YamlConfigLoader.Validate(config);
+
+        Assert.Empty(errors);
+        var warning = Assert.Single(config.Warnings);
+        Assert.Contains("No instances are enabled", warning);
+    }
+
+    [Fact]
+    public void Validate_DisabledInstanceWithEnabledJob_WarnsAboutTheInstance()
+    {
+        // The job flag is enabled, but a disabled instance is never scheduled — the warning must
+        // name the instance as the cause rather than staying silent because a job looks enabled.
+        var config = new AppConfig
+        {
+            Instances = new List<InstanceConfig> { SchedulableInstance("Series", false, jobEnabled: true) }
+        };
+        var errors = YamlConfigLoader.Validate(config);
+
+        Assert.Empty(errors);
+        var warning = Assert.Single(config.Warnings);
+        Assert.Contains("No instances are enabled", warning);
+    }
+
+    [Fact]
+    public void Validate_EnabledInstanceNoEnabledJobs_WarnsAboutTheJobs()
+    {
+        var config = new AppConfig
+        {
+            Instances = new List<InstanceConfig> { SchedulableInstance("Series", true, jobEnabled: false) }
+        };
+        var errors = YamlConfigLoader.Validate(config);
+
+        Assert.Empty(errors);
+        var warning = Assert.Single(config.Warnings);
+        Assert.Contains("No jobs are enabled", warning);
+    }
+
+    [Fact]
+    public void Validate_EnabledInstanceWithEnabledJob_DoesNotWarn()
+    {
+        var config = new AppConfig
+        {
+            Instances = new List<InstanceConfig>
+            {
+                SchedulableInstance("Series", true),
+                SchedulableInstance("Movies", false)
+            }
+        };
+        var errors = YamlConfigLoader.Validate(config);
+
+        Assert.Empty(errors);
+        Assert.Empty(config.Warnings);
+    }
 }

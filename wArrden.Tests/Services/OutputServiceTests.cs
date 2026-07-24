@@ -29,6 +29,37 @@ public class OutputServiceTests
     }
 
     [Fact]
+    public void WriteBanner_NoEnabledInstances_ShowsTheConfigWarning()
+    {
+        // End-to-end for the silent-idle case: validation records the warning and the startup
+        // banner is what actually puts it in front of the operator.
+        var config = new AppConfig
+        {
+            Instances = new List<InstanceConfig>
+            {
+                new()
+                {
+                    Type = "sonarr",
+                    Enabled = false,
+                    Name = "Series",
+                    Url = "http://localhost:8989",
+                    ApiKey = "abc123",
+                    ApiVersion = "v3",
+                    QueueCleanup = new JobConfig { Enabled = true, Cron = "*/5 * * * *" }
+                }
+            }
+        };
+        YamlConfigLoader.Validate(config);
+
+        OutputService.WriteBanner(config, new WardenOptions(), TimeZoneInfo.Utc, _writer);
+
+        var output = _writer.ToString();
+        Assert.Contains("warden.config", output);
+        Assert.Contains("No instances are enabled", output);
+        Assert.Contains("system.ready", output);
+    }
+
+    [Fact]
     public void WriteBanner_WithInstances_ShowsInstanceNames()
     {
         var config = new AppConfig

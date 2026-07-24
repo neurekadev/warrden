@@ -235,13 +235,22 @@ internal static class YamlConfigLoader
             !IsValidLogLevel(config.LogLevel))
             errors.Add($"'logLevel' must be one of: debug, info, warning, error (got '{config.LogLevel}').");
 
-        var enabledJobs = config.Instances.Sum(i =>
-            (i.MissingSearch?.Enabled == true ? 1 : 0) +
-            (i.UpgradeSearch?.Enabled == true ? 1 : 0) +
-            (i.QueueCleanup?.Enabled == true ? 1 : 0));
+        // Jobs on a disabled instance are never scheduled, so only enabled instances can
+        // contribute a job that actually runs.
+        var enabledInstances = config.Instances.Count(i => i.Enabled == true);
+        var enabledJobs = config.Instances
+            .Where(i => i.Enabled == true)
+            .Sum(i =>
+                (i.MissingSearch?.Enabled == true ? 1 : 0) +
+                (i.UpgradeSearch?.Enabled == true ? 1 : 0) +
+                (i.QueueCleanup?.Enabled == true ? 1 : 0));
 
-        if (enabledJobs == 0)
-            config.AddWarning("No jobs are enabled across any instance.");
+        // Both cases leave the scheduler empty. Warn about the outermost cause only, so the
+        // operator is pointed at the one setting that has to change.
+        if (enabledInstances == 0)
+            config.AddWarning("No instances are enabled — no jobs will be scheduled.");
+        else if (enabledJobs == 0)
+            config.AddWarning("No jobs are enabled across any enabled instance — no jobs will be scheduled.");
 
         return errors;
     }
