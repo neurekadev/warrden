@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-07-24
+
+### Added
+- Warn at startup when nothing will run, because no instance is enabled or because the enabled instances have no enabled jobs.
+
 ## [4.5.0] - 2026-07-24
 
 ### Changed
@@ -208,7 +213,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cooldown system to avoid re-searching the same items too frequently
 - Support for both Radarr and Sonarr instances with independent configuration per job type
 - Structured console output with item counts, cooldown status, and result summaries
-[Unreleased]: https://code.neureka.dev/warrden/warrden/-/compare/4.5.0...HEAD
+[Unreleased]: https://code.neureka.dev/warrden/warrden/-/compare/4.6.0...HEAD
+[4.6.0]: https://code.neureka.dev/warrden/warrden/-/compare/4.5.0...4.6.0
 [4.5.0]: https://code.neureka.dev/warrden/warrden/-/compare/4.4.0...4.5.0
 [4.4.0]: https://code.neureka.dev/warrden/warrden/-/compare/4.3.1...4.4.0
 
