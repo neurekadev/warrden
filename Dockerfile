@@ -1,7 +1,7 @@
 FROM --platform=$BUILDPLATFORM golang:1.27-bookworm AS build
 
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
+ARG TARGETOS
+ARG TARGETARCH
 ARG GIT_TAG=dev
 ARG GIT_HASH=unknown
 

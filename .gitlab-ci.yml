@@ -55,20 +55,24 @@ verify-container:
     - docker build --platform linux/arm64 -t warrden:container-test-arm64 .
     - docker build --platform linux/amd64 --build-arg GIT_TAG=container-test --build-arg GIT_HASH=$CI_COMMIT_SHA -t warrden:container-test .
     - docker volume create warrden-container-test-data
-    - docker run --rm --entrypoint /app/bin/clear-missing -e PUID=1000 -e PGID=1000 -e CONFIG_PATH=/config/config.yaml -e DATABASE_PATH=/app/data/warden.db -v warrden-container-test-data:/app/data -v "$CI_PROJECT_DIR/config.example.yaml:/config/config.yaml:ro" warrden:container-test
-    - docker run --rm --entrypoint /app/bin/clear-upgrades -e PUID=1000 -e PGID=1000 -e CONFIG_PATH=/config/config.yaml -e DATABASE_PATH=/app/data/warden.db -v warrden-container-test-data:/app/data -v "$CI_PROJECT_DIR/config.example.yaml:/config/config.yaml:ro" warrden:container-test
+    - docker volume create warrden-container-test-config
+    - docker create --name warrden-container-test-config-writer -v warrden-container-test-config:/config warrden:container-test
+    - docker cp config.example.yaml warrden-container-test-config-writer:/config/config.yaml
+    - docker rm warrden-container-test-config-writer
+    - docker run --rm --entrypoint /app/bin/clear-missing -e PUID=1000 -e PGID=1000 -e CONFIG_PATH=/config/config.yaml -e DATABASE_PATH=/app/data/warden.db -v warrden-container-test-data:/app/data -v warrden-container-test-config:/config:ro warrden:container-test
+    - docker run --rm --entrypoint /app/bin/clear-upgrades -e PUID=1000 -e PGID=1000 -e CONFIG_PATH=/config/config.yaml -e DATABASE_PATH=/app/data/warden.db -v warrden-container-test-data:/app/data -v warrden-container-test-config:/config:ro warrden:container-test
     - docker create --name warrden-container-test-files warrden:container-test
     - docker cp warrden-container-test-files:/etc/ssl/certs/ca-certificates.crt /tmp/ca-certificates.crt
     - test -s /tmp/ca-certificates.crt
     - docker rm warrden-container-test-files
-    - docker run -d --name warrden-container-test-daemon -e PUID=1000 -e PGID=1000 -e TZ=America/Los_Angeles -e CONFIG_PATH=/config/config.yaml -e DATABASE_PATH=/app/data/warden.db -v warrden-container-test-data:/app/data -v "$CI_PROJECT_DIR/config.example.yaml:/config/config.yaml:ro" warrden:container-test
+    - docker run -d --name warrden-container-test-daemon -e PUID=1000 -e PGID=1000 -e TZ=America/Los_Angeles -e CONFIG_PATH=/config/config.yaml -e DATABASE_PATH=/app/data/warden.db -v warrden-container-test-data:/app/data -v warrden-container-test-config:/config:ro warrden:container-test
     - for attempt in $(seq 1 30); do docker logs warrden-container-test-daemon 2>&1 | grep -q "wArrden initialized" && break; sleep 1; done
     - docker logs warrden-container-test-daemon 2>&1 | grep -q "Timezone.*America/Los_Angeles"
     - docker stop --time 10 warrden-container-test-daemon
     - test "$(docker inspect --format '{{.State.ExitCode}}' warrden-container-test-daemon)" = "0"
   after_script:
-    - docker rm -f warrden-container-test-daemon warrden-container-test-files 2>/dev/null || true
-    - docker volume rm warrden-container-test-data 2>/dev/null || true
+    - docker rm -f warrden-container-test-daemon warrden-container-test-files warrden-container-test-config-writer 2>/dev/null || true
+    - docker volume rm warrden-container-test-data warrden-container-test-config 2>/dev/null || true
 
 # The docker build template ships no rules (it would otherwise run on every pipeline)
 # and the release template runs on any tag; scope each generated job by overriding it.

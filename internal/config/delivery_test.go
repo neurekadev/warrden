@@ -51,6 +51,11 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	if strings.Contains(strings.ToLower(dockerfile), "alpine") {
 		t.Error("Dockerfile must not use Alpine")
 	}
+	for _, forbidden := range []string{"ARG TARGETOS=", "ARG TARGETARCH="} {
+		if strings.Contains(dockerfile, forbidden) {
+			t.Errorf("Dockerfile must use BuildKit's automatic target value, found %q", forbidden)
+		}
+	}
 	mainSource := string(readRepositoryFile(t, "../../cmd/warrden/main.go"))
 	if !strings.Contains(mainSource, `_ "time/tzdata"`) {
 		t.Error("cmd/warrden must embed timezone data for the scratch image")
@@ -76,6 +81,8 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		"CGO_ENABLED=1 go test -race ./...",
 		"docker compose config --quiet",
 		"--platform linux/arm64",
+		"docker cp config.example.yaml",
+		"warrden-container-test-config:/config:ro",
 		"/app/bin/clear-missing",
 		"America/Los_Angeles",
 		"ca-certificates.crt",
@@ -84,6 +91,9 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		if !strings.Contains(pipelineText, want) {
 			t.Errorf(".gitlab-ci.yml missing %q", want)
 		}
+	}
+	if strings.Contains(pipelineText, "$CI_PROJECT_DIR") {
+		t.Error("container smoke tests must not bind runner-local paths through the host Docker daemon")
 	}
 }
 
