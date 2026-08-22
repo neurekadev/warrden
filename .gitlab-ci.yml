@@ -48,12 +48,6 @@ verify-go:
 verify-container:
   stage: container-test
   image: docker:27.5.1-cli
-  services:
-    - name: docker:27.5.1-dind
-      command: ["--tls=false"]
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
   script:
     - cp .env.example .env
     - cp config.example.yaml config.yaml
