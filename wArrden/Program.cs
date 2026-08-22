@@ -26,7 +26,7 @@ try
 {
     SentrySdk.Init(o =>
     {
-        o.Dsn = "https://ca3bcb7569913062d079984cce25219e@beacon.neureka.dev/2";
+        o.Dsn = "https://ca3bcb7569913062d079984cce25219e@beacon.neureka.dev/api/v1/sentry/2";
         if (!string.IsNullOrWhiteSpace(opts.AppVersion))
             o.Release = opts.AppVersion;
     });
