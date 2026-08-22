@@ -7,6 +7,9 @@ obj/
 *.db*
 *.db-shm
 *.db-wal
+/warrden
+/coverage.out
+/.env
 .vscode/
 .idea/
 *.swp

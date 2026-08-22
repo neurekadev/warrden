@@ -25,10 +25,11 @@ wArrden makes it easy to maintain your media libraries by finding missing or upg
 > [!TIP]
 > The `config.example.yaml` file can look overwhelming, but you don't need to understand every option to get started. Just add your arr URL and API key, then enable the instance — the defaults handle the rest.
 
-1. Download `compose.yaml`:
+1. Download `compose.yaml` and the environment template:
 
    ```
    curl -O https://code.neureka.dev/warrden/warrden/-/raw/main/compose.yaml
+   curl -o .env https://code.neureka.dev/warrden/warrden/-/raw/main/.env.example
    ```
 
 2. Download the example config as `config.yaml`, then edit it with your Sonarr/Radarr URLs and API keys:

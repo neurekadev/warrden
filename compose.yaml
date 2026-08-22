@@ -4,15 +4,8 @@ services:
   warrden:
     image: registry.neureka.dev/warrden/warrden:4
     container_name: warrden
-    environment:
-      - TZ=UTC
-      - PUID=1000
-      - PGID=1000
-      - DATABASE_PATH=/app/data/warden.db
-      - CONFIG_PATH=/config/config.yaml
-      # Optional HTTP resilience tuning (defaults shown; safe to omit entirely):
-      # - HTTP_RETRY_COUNT=3       # retry attempts for transient arr failures (5xx/timeout/refused)
-      # - HTTP_TIMEOUT_SECONDS=30  # per-attempt HTTP timeout
+    env_file:
+      - .env
     networks:
       - warrden
     volumes:
