@@ -65,8 +65,8 @@ verify-container:
     - test -s /tmp/ca-certificates.crt
     - docker rm warrden-container-test-files
     - docker run -d --name warrden-container-test-daemon -e PUID=1000 -e PGID=1000 -e TZ=America/Los_Angeles -v warrden-container-test-data:/app/data warrden:container-test
-    - for attempt in $(seq 1 30); do docker logs warrden-container-test-daemon 2>&1 | grep -q "wArrden initialized" && break; sleep 1; done
-    - docker logs warrden-container-test-daemon 2>&1 | grep -q "Timezone.*America/Los_Angeles"
+    - initialized=false; for attempt in $(seq 1 30); do if docker logs warrden-container-test-daemon 2>&1 | grep -F "wArrden initialized" >/dev/null; then initialized=true; break; fi; sleep 1; done; test "$initialized" = true
+    - docker logs warrden-container-test-daemon 2>&1 | grep -E "Timezone.*America/Los_Angeles" >/dev/null
     - docker stop --time 10 warrden-container-test-daemon
     - test "$(docker inspect --format '{{.State.ExitCode}}' warrden-container-test-daemon)" = "0"
   after_script:
