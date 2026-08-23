@@ -40,14 +40,56 @@ func TestCaptureAddsLegacyDiagnosticContext(t *testing.T) {
 	}
 }
 
-func TestNewUsesConfiguredRelease(t *testing.T) {
+func TestNewConfiguresEventOnlyReportingAndInstallUser(t *testing.T) {
 	t.Parallel()
-	reporter := New("4.2.0")
+	transport := &captureTransport{}
+	installID := "f08e267c-9070-4f3a-a485-5fcfa26a1670"
+	reporter := newReporter("4.2.0", "production", installID, transport)
 	if reporter.hub == nil {
 		t.Fatal("valid DSN unexpectedly disabled reporting")
 	}
-	if release := reporter.hub.Client().Options().Release; release != "4.2.0" {
-		t.Fatalf("release = %q, want configured release", release)
+	options := reporter.hub.Client().Options()
+	if options.Release != "4.2.0" || options.Environment != "production" {
+		t.Fatalf("options release=%q environment=%q", options.Release, options.Environment)
+	}
+	if options.EnableTracing || options.TracesSampleRate != 0 || !options.DisableLogs || !options.DisableMetrics || !options.DisableClientReports || !options.DisableTelemetryBuffer {
+		t.Fatalf("non-error Sentry features were not disabled: %#v", options)
+	}
+	reporter.Capture(errors.New("boom"), "warden.telemetry", "Controlled report")
+	event := transport.captured()
+	if event == nil {
+		t.Fatal("no event captured")
+	}
+	if event.User.ID != installID {
+		t.Fatalf("captured user=%#v, want install ID %q", event.User, installID)
+	}
+}
+
+func TestNewDisablesReportingWithoutInstallID(t *testing.T) {
+	t.Parallel()
+	if reporter := New("4.2.0", "production", ""); reporter.hub != nil {
+		t.Fatal("reporting was enabled without a stable installation ID")
+	}
+}
+
+func TestRecoverCapturesAndPreservesPanic(t *testing.T) {
+	t.Parallel()
+	transport := &captureTransport{}
+	reporter := newReporter("4.2.0", "production", "f08e267c-9070-4f3a-a485-5fcfa26a1670", transport)
+	var recovered any
+	func() {
+		defer func() { recovered = recover() }()
+		func() {
+			defer reporter.Recover()
+			panic("controlled panic")
+		}()
+	}()
+	if recovered != "controlled panic" {
+		t.Fatalf("recovered=%v, want controlled panic", recovered)
+	}
+	event := transport.captured()
+	if event == nil || event.Level != sentry.LevelFatal || event.Message != "controlled panic" {
+		t.Fatalf("panic event=%#v", event)
 	}
 }
 

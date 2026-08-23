@@ -122,6 +122,14 @@ func TestParseExample(t *testing.T) {
 	if cfg.Instances[0].APIVersion != "v3" {
 		t.Errorf("apiVersion=%q", cfg.Instances[0].APIVersion)
 	}
+	for _, instance := range cfg.Instances {
+		if instance.MissingSearch != nil && instance.MissingSearch.Cooldown != 30*24*time.Hour {
+			t.Errorf("%s missing cooldown=%s, want 30d", instance.Name, instance.MissingSearch.Cooldown)
+		}
+		if instance.UpgradeSearch != nil && instance.UpgradeSearch.Cooldown != 90*24*time.Hour {
+			t.Errorf("%s upgrade cooldown=%s, want 90d", instance.Name, instance.UpgradeSearch.Cooldown)
+		}
+	}
 }
 
 func TestDurationCompatibility(t *testing.T) {
@@ -205,41 +213,27 @@ instances:
 }
 
 func TestOptionsFromEnv(t *testing.T) {
-	for key, value := range map[string]string{"DRY_RUN": "TRUE", "DATABASE_PATH": "custom.db", "CONFIG_PATH": "custom.yaml", "HTTP_RETRY_COUNT": "0", "HTTP_TIMEOUT_SECONDS": "45", "TZ": "UTC", "APP_VERSION": "1.2.3"} {
+	for key, value := range map[string]string{"DRY_RUN": "TRUE", "HTTP_RETRY_COUNT": "0", "HTTP_TIMEOUT_SECONDS": "45", "TZ": "UTC", "GIT_TAG": "1.2.3"} {
 		t.Setenv(key, value)
 	}
 	opts := OptionsFromEnv()
-	if !opts.DryRun || opts.DatabasePath != "custom.db" || opts.ConfigPath != "custom.yaml" || opts.RetryCount != 0 || opts.AttemptTimeout != 45*time.Second || opts.AppVersion != "1.2.3" {
+	if !opts.DryRun || opts.RetryCount != 0 || opts.AttemptTimeout != 45*time.Second || opts.AppVersion != "1.2.3" {
 		t.Fatalf("options=%#v", opts)
 	}
 }
 
-func TestOptionsBuildVersionFallbackAndOverride(t *testing.T) {
+func TestOptionsUseBuildVersionWithoutRuntimeOverride(t *testing.T) {
 	t.Setenv("GIT_TAG", "4.2.1")
-	unsetEnvironment(t, "APP_VERSION")
 	if got := OptionsFromEnv().AppVersion; got != "4.2.1" {
-		t.Fatalf("build version fallback = %q", got)
+		t.Fatalf("build version = %q", got)
 	}
 	t.Setenv("APP_VERSION", "operator-override")
-	if got := OptionsFromEnv().AppVersion; got != "operator-override" {
-		t.Fatalf("runtime override = %q", got)
+	if got := OptionsFromEnv().AppVersion; got != "4.2.1" {
+		t.Fatalf("APP_VERSION changed build version to %q", got)
 	}
-	t.Setenv("APP_VERSION", "")
-	if opts := OptionsFromEnv(); opts.AppVersion != "" || !opts.AppVersionSet {
-		t.Fatalf("explicit empty runtime override was not retained: %#v", opts)
-	}
-}
-
-func TestOptionsDistinguishUnsetAndEmptyPaths(t *testing.T) {
-	unsetEnvironment(t, "DATABASE_PATH")
-	unsetEnvironment(t, "CONFIG_PATH")
-	if opts := OptionsFromEnv(); opts.DatabasePath != "data/warden.db" || opts.ConfigPath != "data/config.yaml" {
-		t.Fatalf("unset defaults = %#v", opts)
-	}
-	t.Setenv("DATABASE_PATH", "")
-	t.Setenv("CONFIG_PATH", "")
-	if opts := OptionsFromEnv(); opts.DatabasePath != "" || opts.ConfigPath != "" {
-		t.Fatalf("explicit empty paths = %#v", opts)
+	t.Setenv("GIT_TAG", "")
+	if got := OptionsFromEnv().AppVersion; got != "dev" {
+		t.Fatalf("empty build version = %q", got)
 	}
 }
 
@@ -260,19 +254,4 @@ func TestOptionsUseInt32CompatibilityAndDefaults(t *testing.T) {
 			}
 		})
 	}
-}
-
-func unsetEnvironment(t *testing.T, key string) {
-	t.Helper()
-	value, existed := os.LookupEnv(key)
-	if err := os.Unsetenv(key); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if existed {
-			_ = os.Setenv(key, value)
-		} else {
-			_ = os.Unsetenv(key)
-		}
-	})
 }

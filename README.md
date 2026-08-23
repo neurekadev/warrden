@@ -44,10 +44,10 @@ wArrden makes it easy to maintain your media libraries by finding missing or upg
    ```
 
 > [!NOTE]
-> `config.yaml` is bind-mounted read-only — edit it on the host and run
-> `docker compose restart warrden` to apply changes. It must exist before
+> `config.yaml` is bind-mounted at `/app/data/config.yaml` — edit it on the host
+> and run `docker compose restart warrden` to apply changes. It must exist before
 > `docker compose up` (a single-file bind mount would otherwise create a directory).
-> Application data (the database and cache) persists in the `data` Docker volume.
+> The database and anonymous installation ID persist in the `data` Docker volume.
 
 ## CLI Usage
 
@@ -78,6 +78,14 @@ Periodically searches for monitored content that already exists on disk but has 
 ## Queue Cleanup
 
 Detects stuck imports caused by common errors (wrong episode, not an upgrade, sample, corrupt file) and removes or blocklists them so the same release won't download again.
+
+## Telemetry
+
+wArrden reports unexpected application errors and anonymous installation lifecycle
+events to the project's Beacon service. A random installation UUID is generated once
+in `data/install-id` and reused after container recreation; Beacon hashes that ID during
+analytics ingestion. Install analytics contain only lifecycle event names, timestamps,
+the wArrden release, the runtime platform, and clean-shutdown duration and reason.
 
 ## Why Use wArrden?
 

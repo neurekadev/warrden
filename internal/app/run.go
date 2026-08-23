@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -26,14 +27,53 @@ import (
 	"code.neureka.dev/warrden/warrden/internal/telemetry"
 )
 
+const telemetryShutdownTimeout = 3 * time.Second
+
+type errorReporter interface {
+	Capture(error, string, string)
+	Flush(context.Context) bool
+	Recover()
+}
+
+type lifecycleAnalytics interface {
+	Start(context.Context)
+	Stop(context.Context, string)
+}
+
+type outputDebugger interface {
+	Debug(string, string, ...string)
+}
+
+type runDependencies struct {
+	loadInstallID func(string) (string, error)
+	newReporter   func(string, string, string) errorReporter
+	newAnalytics  func(string, string, string, outputDebugger) lifecycleAnalytics
+}
+
+func defaultRunDependencies() runDependencies {
+	return runDependencies{
+		loadInstallID: telemetry.LoadOrCreateInstallID,
+		newReporter: func(release, environment, installID string) errorReporter {
+			return telemetry.New(release, environment, installID)
+		},
+		newAnalytics: func(installID, release, platform string, debug outputDebugger) lifecycleAnalytics {
+			return telemetry.NewAnalytics(installID, release, platform, debug)
+		},
+	}
+}
+
 // Run executes wArrden and returns its process exit code.
 func Run(ctx context.Context, args []string, stdout io.Writer) int {
+	return run(ctx, args, stdout, defaultRunDependencies())
+}
+
+func run(ctx context.Context, args []string, stdout io.Writer, dependencies runDependencies) int {
 	opts := config.OptionsFromEnv()
 	earlyOutput := output.New(stdout, output.Error, time.UTC, nil)
-	cfg, err := config.Load(opts.ConfigPath)
+	cfg, err := config.Load(configPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			earlyOutput.ErrorText("cli", "Config file not found: "+opts.ConfigPath)
+			earlyOutput.ErrorText("cli", "Config file not found: "+configPath)
 		} else {
 			var configErr *config.Error
 			if errors.As(err, &configErr) {
@@ -47,7 +87,7 @@ func Run(ctx context.Context, args []string, stdout io.Writer) int {
 		return 1
 	}
 	startupOutput := output.New(stdout, output.ParseLevel(cfg.LogLevel), time.UTC, nil)
-	startupOutput.Debug("warden.config", "Loaded config from "+opts.ConfigPath)
+	startupOutput.Debug("warden.config", "Loaded config from "+configPath)
 	startupOutput.Debug("warden.config", "Log level set to "+cfg.LogLevel)
 
 	location, timezoneWarning := resolveTimezone(opts.Timezone)
@@ -57,7 +97,7 @@ func Run(ctx context.Context, args []string, stdout io.Writer) int {
 	}
 	out := output.New(stdout, output.ParseLevel(cfg.LogLevel), location, nil)
 
-	databasePath, err := filepath.Abs(opts.DatabasePath)
+	databasePath, err := filepath.Abs(databasePath)
 	if err != nil {
 		out.ErrorText("warden.config", "Invalid database path", err.Error())
 		return 1
@@ -67,13 +107,41 @@ func Run(ctx context.Context, args []string, stdout io.Writer) int {
 		out.ErrorText("warden.config", "Container identity setup failed", err.Error())
 		return 1
 	}
-	reporter := telemetry.New(opts.AppVersion)
+	legacyPath, err := filepath.Abs(legacyDatabasePath)
+	if err != nil {
+		out.ErrorText("warden.config", "Invalid legacy database path", err.Error())
+		return 1
+	}
+	migrated, err := migrateLegacyDatabase(legacyPath, databasePath)
+	if err != nil {
+		out.ErrorText("warden.database", "Legacy database migration failed", err.Error())
+		return 1
+	}
+	if migrated {
+		out.Debug("warden.database", "Renamed legacy database to "+databasePath)
+	}
+
+	installPath, err := filepath.Abs(installIDPath)
+	if err != nil {
+		out.Warn("warden.telemetry", "Telemetry disabled — installation ID path is invalid", err.Error())
+	}
+	installID := ""
+	if err == nil {
+		installID, err = dependencies.loadInstallID(installPath)
+		if err != nil {
+			out.Warn("warden.telemetry", "Telemetry disabled — installation ID is unavailable", err.Error())
+		}
+	}
+	environment := deploymentEnvironment(opts.AppVersion)
+	reporter := dependencies.newReporter(opts.AppVersion, environment, installID)
 	defer func() {
 		flushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 		defer cancel()
 		reporter.Flush(flushCtx)
 	}()
+	defer reporter.Recover()
 	out = output.New(stdout, output.ParseLevel(cfg.LogLevel), location, reporter)
+	analytics := dependencies.newAnalytics(installID, opts.AppVersion, runtime.GOOS+"-"+runtime.GOARCH, out)
 
 	args = aliasArgs(args)
 	if len(args) > 0 {
@@ -86,10 +154,21 @@ func Run(ctx context.Context, args []string, stdout io.Writer) int {
 			return 1
 		}
 	}
-	return runDaemon(ctx, cfg, opts, databasePath, location, out, runtimeWarnings)
+	return runDaemon(ctx, cfg, opts, databasePath, location, out, runtimeWarnings, analytics)
 }
 
-func runDaemon(ctx context.Context, cfg *config.Config, opts config.Options, databasePath string, location *time.Location, out *output.Writer, runtimeWarnings []string) (exitCode int) {
+func runDaemon(ctx context.Context, cfg *config.Config, opts config.Options, databasePath string, location *time.Location, out *output.Writer, runtimeWarnings []string, analytics lifecycleAnalytics) (exitCode int) {
+	if analytics != nil {
+		defer func() {
+			shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), telemetryShutdownTimeout)
+			defer cancel()
+			reason := "shutdown"
+			if exitCode != 0 {
+				reason = "error"
+			}
+			analytics.Stop(shutdownCtx, reason)
+		}()
+	}
 	store, reset, err := cooldown.Open(ctx, databasePath, out)
 	if err != nil {
 		out.ErrorText("warden.database", "Database initialization failed", err.Error())
@@ -140,8 +219,23 @@ func runDaemon(ctx context.Context, cfg *config.Config, opts config.Options, dat
 	out.Banner(cfg, opts, tracker.Reason, runtimeWarnings)
 	runRetroactive(ctx, cfg, clients, tracker, tagger, out)
 	scheduler.Start()
+	if analytics != nil {
+		analytics.Start(ctx)
+	}
 	<-ctx.Done()
 	return 0
+}
+
+func deploymentEnvironment(release string) string {
+	value := strings.ToLower(strings.TrimSpace(release))
+	switch {
+	case value == "" || value == "dev":
+		return "development"
+	case strings.HasPrefix(value, "edge-"):
+		return "edge"
+	default:
+		return "production"
+	}
 }
 
 func addJobs(cfg *config.Config, opts config.Options, clients map[string]*arr.Client, tracker *health.Tracker, runner *search.Runner, out *output.Writer, scheduler *schedule.Scheduler) error {

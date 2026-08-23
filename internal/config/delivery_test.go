@@ -17,15 +17,17 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	}
 	composeText := strings.ReplaceAll(string(compose), "\r\n", "\n")
 	for _, want := range []string{
-		"name: warrden",
 		"env_file:\n      - .env",
 		"data:/app/data",
-		"./config.yaml:/config/config.yaml:ro",
+		"./config.yaml:/app/data/config.yaml",
 		"restart: unless-stopped",
 	} {
 		if !strings.Contains(composeText, want) {
 			t.Errorf("compose.yaml missing %q", want)
 		}
+	}
+	if strings.HasPrefix(composeText, "name:") {
+		t.Error("compose.yaml must not set a top-level project name")
 	}
 	if strings.Contains(composeText, "cap_drop:") || strings.Contains(composeText, "cap_add:") {
 		t.Error("compose.yaml must preserve Docker's default capability set for recursive ownership changes")
@@ -62,9 +64,23 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	}
 
 	environment := string(readRepositoryFile(t, "../../.env.example"))
-	for _, key := range []string{"PUID=", "PGID=", "TZ=", "DRY_RUN=", "APP_VERSION=", "CONFIG_PATH=", "HTTP_RETRY_COUNT=", "HTTP_TIMEOUT_SECONDS=", "DATABASE_PATH="} {
+	for _, key := range []string{"PUID=", "PGID=", "TZ=", "DRY_RUN="} {
 		if !strings.Contains(environment, key) {
 			t.Errorf(".env.example missing %s", key)
+		}
+	}
+	for _, key := range []string{"APP_VERSION=", "CONFIG_PATH=", "HTTP_RETRY_COUNT=", "HTTP_TIMEOUT_SECONDS=", "DATABASE_PATH="} {
+		if strings.Contains(environment, key) {
+			t.Errorf(".env.example must omit %s", key)
+		}
+	}
+	lines := strings.Split(strings.TrimSpace(environment), "\n")
+	if len(lines) == 0 || lines[0] != "# --[ RUNTIME ]----------------------------------------------------------------" {
+		t.Error(".env.example must start with the RUNTIME capsule header")
+	}
+	for _, line := range lines {
+		if strings.HasPrefix(line, "# --[") && len(line) != 79 {
+			t.Errorf(".env.example capsule header length=%d, want 79: %q", len(line), line)
 		}
 	}
 
@@ -81,8 +97,7 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		"CGO_ENABLED=1 go test -race ./...",
 		"docker compose config --quiet",
 		"--platform linux/arm64",
-		"docker cp config.example.yaml",
-		"warrden-container-test-config:/config:ro",
+		"docker cp config.example.yaml warrden-container-test-config-writer:/app/data/config.yaml",
 		"/app/bin/clear-missing",
 		"America/Los_Angeles",
 		"ca-certificates.crt",
@@ -90,6 +105,11 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	} {
 		if !strings.Contains(pipelineText, want) {
 			t.Errorf(".gitlab-ci.yml missing %q", want)
+		}
+	}
+	for _, forbidden := range []string{"CONFIG_PATH=", "DATABASE_PATH=", "warden.db", "warrden-container-test-config:/config"} {
+		if strings.Contains(pipelineText, forbidden) {
+			t.Errorf(".gitlab-ci.yml contains removed runtime setting %q", forbidden)
 		}
 	}
 	if strings.Contains(pipelineText, "$CI_PROJECT_DIR") {

@@ -71,10 +71,10 @@ instances:
       # Minimum time before an item can be re-searched.
       # Type: required
       # Values: Duration string (e.g. 30d, 12h, 90m, 1h30m)
-      # 30d is a safe conservative default for most users. Very large
-      # libraries may benefit from a longer cooldown. Shorter values
-      # risk indexer rate-limiting or bans.
-      cooldown: 30d
+      # 90d is the default for upgrade searches. Very large libraries may
+      # benefit from a longer cooldown. Shorter values risk indexer
+      # rate-limiting or bans.
+      cooldown: 90d
       # Automatically tag searched items with a label on the arr instance.
       # Type: optional
       tagging:
@@ -182,10 +182,10 @@ instances:
       # Minimum time before an item can be re-searched.
       # Type: required
       # Values: Duration string (e.g. 30d, 12h, 90m, 1h30m)
-      # 30d is a safe conservative default for most users. Very large
-      # libraries may benefit from a longer cooldown. Shorter values
-      # risk indexer rate-limiting or bans.
-      cooldown: 30d
+      # 90d is the default for upgrade searches. Very large libraries may
+      # benefit from a longer cooldown. Shorter values risk indexer
+      # rate-limiting or bans.
+      cooldown: 90d
       # Automatically tag searched items with a label on the arr instance.
       # Type: optional
       tagging:
@@ -293,10 +293,10 @@ instances:
       # Minimum time before an item can be re-searched.
       # Type: required
       # Values: Duration string (e.g. 30d, 12h, 90m, 1h30m)
-      # 30d is a safe conservative default for most users. Very large
-      # libraries may benefit from a longer cooldown. Shorter values
-      # risk indexer rate-limiting or bans.
-      cooldown: 30d
+      # 90d is the default for upgrade searches. Very large libraries may
+      # benefit from a longer cooldown. Shorter values risk indexer
+      # rate-limiting or bans.
+      cooldown: 90d
       # Automatically tag searched items with a label on the arr instance.
       # Type: optional
       tagging:
@@ -404,10 +404,10 @@ instances:
       # Minimum time before an item can be re-searched.
       # Type: required
       # Values: Duration string (e.g. 30d, 12h, 90m, 1h30m)
-      # 30d is a safe conservative default for most users. Very large
-      # libraries may benefit from a longer cooldown. Shorter values
-      # risk indexer rate-limiting or bans.
-      cooldown: 30d
+      # 90d is the default for upgrade searches. Very large libraries may
+      # benefit from a longer cooldown. Shorter values risk indexer
+      # rate-limiting or bans.
+      cooldown: 90d
       # Automatically tag searched items with a label on the arr instance.
       # Type: optional
       tagging:
@@ -507,10 +507,10 @@ instances:
       # Minimum time before an item can be re-searched.
       # Type: required
       # Values: Duration string (e.g. 30d, 12h, 90m, 1h30m)
-      # 30d is a safe conservative default for most users. Very large
-      # libraries may benefit from a longer cooldown. Shorter values
-      # risk indexer rate-limiting or bans.
-      cooldown: 30d
+      # 90d is the default for upgrade searches. Very large libraries may
+      # benefit from a longer cooldown. Shorter values risk indexer
+      # rate-limiting or bans.
+      cooldown: 90d
       # Automatically tag searched items with a label on the arr instance.
       # Type: optional
       tagging:

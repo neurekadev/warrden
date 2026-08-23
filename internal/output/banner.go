@@ -64,8 +64,8 @@ func writeRuntime(buffer *bytes.Buffer, root, child string, opts config.Options,
 	if abbr == "UTC" {
 		abbr = "CUT"
 	}
-	version := opts.AppVersion
-	if !opts.AppVersionSet {
+	version := strings.TrimSpace(opts.AppVersion)
+	if version == "" {
 		version = "dev"
 	}
 	tzID := opts.Timezone

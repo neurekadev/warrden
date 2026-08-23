@@ -41,6 +41,8 @@ func TestAliasArgsDispatchesByExecutableName(t *testing.T) {
 
 func TestRunClearAliasCreatesGoDatabase(t *testing.T) {
 	directory := prepareRunTest(t)
+	t.Setenv("CONFIG_PATH", filepath.Join(directory, "ignored-config.yaml"))
+	t.Setenv("DATABASE_PATH", filepath.Join(directory, "ignored.db"))
 	var stdout bytes.Buffer
 	code := Run(context.Background(), []string{"/app/bin/clear-missing", "Series"}, &stdout)
 	if code != 0 {
@@ -51,8 +53,21 @@ func TestRunClearAliasCreatesGoDatabase(t *testing.T) {
 			t.Errorf("missing %q:\n%s", want, stdout.String())
 		}
 	}
-	if _, err := os.Stat(filepath.Join(directory, "cooldowns.db")); err != nil {
+	if _, err := os.Stat(filepath.Join(directory, "data", "warrden.db")); err != nil {
 		t.Fatalf("database was not created: %v", err)
+	}
+}
+
+func TestDeploymentEnvironment(t *testing.T) {
+	t.Parallel()
+	tests := map[string]string{
+		"": "development", "dev": "development", "DEV": "development",
+		"edge-abc123": "edge", "4.7.0": "production",
+	}
+	for release, want := range tests {
+		if got := deploymentEnvironment(release); got != want {
+			t.Errorf("deploymentEnvironment(%q)=%q, want %q", release, got, want)
+		}
 	}
 }
 
@@ -78,15 +93,16 @@ func TestRunRejectsInvalidIdentityBeforeDatabaseOpen(t *testing.T) {
 	if code != 1 || !strings.Contains(stdout.String(), "Container identity setup failed") {
 		t.Fatalf("exit=%d output:\n%s", code, stdout.String())
 	}
-	if _, err := os.Stat(filepath.Join(directory, "cooldowns.db")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(directory, "data", "warrden.db")); !os.IsNotExist(err) {
 		t.Fatalf("database should not be opened, stat error=%v", err)
 	}
 }
 
 func TestRunMissingConfigUsesEstablishedError(t *testing.T) {
 	directory := t.TempDir()
-	t.Setenv("CONFIG_PATH", filepath.Join(directory, "missing.yaml"))
-	t.Setenv("DATABASE_PATH", filepath.Join(directory, "cooldowns.db"))
+	t.Chdir(directory)
+	t.Setenv("CONFIG_PATH", filepath.Join(directory, "ignored.yaml"))
+	t.Setenv("DATABASE_PATH", filepath.Join(directory, "ignored.db"))
 	uid, gid := testIdentity()
 	t.Setenv("PUID", uid)
 	t.Setenv("PGID", gid)
@@ -106,7 +122,7 @@ func TestRunDisablesRejectedAPIKeyAndShutsDown(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
 	t.Cleanup(server.Close)
-	configPath := filepath.Join(directory, "config.yaml")
+	configPath := filepath.Join(directory, "data", "config.yaml")
 	content := "logLevel: info\ninstances:\n  - type: sonarr\n    enabled: true\n    name: Series\n    url: " + server.URL + "\n    apiVersion: v3\n    apiKey: secret\n"
 	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
@@ -116,7 +132,12 @@ func TestRunDisablesRejectedAPIKeyAndShutsDown(t *testing.T) {
 	defer cancel()
 	stdout := newReadyWriter()
 	done := make(chan int, 1)
-	go func() { done <- Run(ctx, []string{"warrden"}, stdout) }()
+	dependencies := defaultRunDependencies()
+	analytics := &fakeAnalytics{}
+	dependencies.newAnalytics = func(string, string, string, outputDebugger) lifecycleAnalytics {
+		return analytics
+	}
+	go func() { done <- run(ctx, []string{"warrden"}, stdout, dependencies) }()
 	select {
 	case <-stdout.ready:
 		cancel()
@@ -134,6 +155,11 @@ func TestRunDisablesRejectedAPIKeyAndShutsDown(t *testing.T) {
 	text := stdout.String()
 	if !strings.Contains(text, "DISABLED — API key rejected (401 Unauthorized)") || !strings.Contains(text, "Fix the API key and restart wArrden") {
 		t.Fatalf("missing disabled health state:\n%s", text)
+	}
+	analytics.mu.Lock()
+	defer analytics.mu.Unlock()
+	if !analytics.started || !analytics.stopped || analytics.reason != "shutdown" {
+		t.Fatalf("analytics lifecycle started=%t stopped=%t reason=%q", analytics.started, analytics.stopped, analytics.reason)
 	}
 }
 
@@ -225,7 +251,11 @@ func TestFailureReportingFiltersExpectedArrFailures(t *testing.T) {
 func prepareRunTest(t *testing.T) string {
 	t.Helper()
 	directory := t.TempDir()
-	configPath := filepath.Join(directory, "config.yaml")
+	t.Chdir(directory)
+	if err := os.MkdirAll(filepath.Join(directory, "data"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(directory, "data", "config.yaml")
 	content := `logLevel: info
 instances:
   - type: sonarr
@@ -238,13 +268,11 @@ instances:
 	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("CONFIG_PATH", configPath)
-	t.Setenv("DATABASE_PATH", filepath.Join(directory, "cooldowns.db"))
 	uid, gid := testIdentity()
 	t.Setenv("PUID", uid)
 	t.Setenv("PGID", gid)
 	t.Setenv("TZ", "UTC")
-	t.Setenv("APP_VERSION", "test")
+	t.Setenv("GIT_TAG", "test")
 	return directory
 }
 
@@ -257,7 +285,27 @@ type readyWriter struct {
 
 type captureReporter struct{ count int }
 
+type fakeAnalytics struct {
+	mu      sync.Mutex
+	started bool
+	stopped bool
+	reason  string
+}
+
 func (r *captureReporter) Capture(error, string, string) { r.count++ }
+
+func (a *fakeAnalytics) Start(context.Context) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.started = true
+}
+
+func (a *fakeAnalytics) Stop(_ context.Context, reason string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.stopped = true
+	a.reason = reason
+}
 
 func newReadyWriter() *readyWriter { return &readyWriter{ready: make(chan struct{})} }
 
