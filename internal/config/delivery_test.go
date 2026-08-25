@@ -17,7 +17,7 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	}
 	composeText := strings.ReplaceAll(string(compose), "\r\n", "\n")
 	for _, want := range []string{
-		"image: ghcr.io/neurekadev/warrden:4",
+		"image: ghcr.io/neurekadev/warrden:5",
 		"env_file:\n      - .env",
 		"data:/app/data",
 		"./config.yaml:/app/data/config.yaml",
