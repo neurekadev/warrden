@@ -40,12 +40,6 @@ wArrden makes it easy to maintain your media libraries by finding missing or upg
    docker compose up -d
    ```
 
-> [!NOTE]
-> `config.yaml` is bind-mounted at `/app/data/config.yaml` — edit it on the host
-> and run `docker compose restart warrden` to apply changes. It must exist before
-> `docker compose up` (a single-file bind mount would otherwise create a directory).
-> The database and anonymous installation ID persist in the `data` Docker volume.
-
 ## CLI Usage
 
 | Command                                         | Description                                                                                 |
