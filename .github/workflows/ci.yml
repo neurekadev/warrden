@@ -137,7 +137,6 @@ jobs:
       packages: write
       id-token: write
       attestations: write
-      artifact-metadata: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -187,7 +186,7 @@ jobs:
         with:
           subject-name: ${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.image.outputs.digest }}
-          push-to-registry: true
+          push-to-registry: false
 
   publish-release:
     name: Publish release image
@@ -201,7 +200,6 @@ jobs:
       packages: write
       id-token: write
       attestations: write
-      artifact-metadata: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -252,7 +250,7 @@ jobs:
         with:
           subject-name: ${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.image.outputs.digest }}
-          push-to-registry: true
+          push-to-registry: false
 
   release:
     name: Create GitHub release

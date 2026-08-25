@@ -148,7 +148,7 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		"type=raw,value=latest",
 		"packages: write",
 		"attestations: write",
-		"artifact-metadata: write",
+		"push-to-registry: false",
 		"contents: write",
 		"gh release create",
 	} {
@@ -164,6 +164,8 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		"$CI_",
 		"code.neureka.dev",
 		"registry.neureka.dev",
+		"push-to-registry: true",
+		"artifact-metadata: write",
 	} {
 		if strings.Contains(workflowText, forbidden) {
 			t.Errorf(".github/workflows/ci.yml contains forbidden value %q", forbidden)
@@ -171,6 +173,9 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	}
 	if strings.Contains(workflowText, "$CI_PROJECT_DIR") {
 		t.Error("container smoke tests must not bind runner-local paths through the host Docker daemon")
+	}
+	if got := strings.Count(workflowText, "push-to-registry: false"); got != 2 {
+		t.Errorf("expected registry attestation publishing to be disabled for edge and release images, got %d", got)
 	}
 	if _, err := os.Stat("../../.gitlab-ci.yml"); !os.IsNotExist(err) {
 		t.Errorf(".gitlab-ci.yml must be removed, stat error: %v", err)
