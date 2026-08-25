@@ -213,29 +213,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cooldown system to avoid re-searching the same items too frequently
 - Support for both Radarr and Sonarr instances with independent configuration per job type
 - Structured console output with item counts, cooldown status, and result summaries
-[Unreleased]: https://code.neureka.dev/warrden/warrden/-/compare/4.6.0...HEAD
-[4.6.0]: https://code.neureka.dev/warrden/warrden/-/compare/4.5.0...4.6.0
-[4.5.0]: https://code.neureka.dev/warrden/warrden/-/compare/4.4.0...4.5.0
-[4.4.0]: https://code.neureka.dev/warrden/warrden/-/compare/4.3.1...4.4.0
+[Unreleased]: https://github.com/neurekadev/warrden/compare/4.6.0...HEAD
+[4.6.0]: https://github.com/neurekadev/warrden/compare/4.5.0...4.6.0
+[4.5.0]: https://github.com/neurekadev/warrden/compare/4.4.0...4.5.0
+[4.4.0]: https://github.com/neurekadev/warrden/compare/4.3.1...4.4.0
 
-[4.3.1]: https://code.neureka.dev/warrden/warrden/-/compare/4.3.0...4.3.1
-[4.3.0]: https://code.neureka.dev/warrden/warrden/-/compare/4.2.0...4.3.0
-[4.2.0]: https://code.neureka.dev/warrden/warrden/-/compare/4.1.4...4.2.0
-[4.1.4]: https://code.neureka.dev/warrden/warrden/-/compare/4.1.3...4.1.4
-[4.1.3]: https://code.neureka.dev/warrden/warrden/-/compare/4.1.2...4.1.3
-[4.1.2]: https://code.neureka.dev/warrden/warrden/-/compare/4.1.1...4.1.2
-[4.1.1]: https://code.neureka.dev/warrden/warrden/-/compare/4.1.0...4.1.1
-[4.1.0]: https://code.neureka.dev/warrden/warrden/-/compare/4.0.2...4.1.0
-[4.0.2]: https://code.neureka.dev/warrden/warrden/-/compare/4.0.1...4.0.2
-[4.0.1]: https://code.neureka.dev/warrden/warrden/-/compare/4.0.0...4.0.1
-[4.0.0]: https://code.neureka.dev/warrden/warrden/-/compare/3.1.0...4.0.0
-[3.1.0]: https://code.neureka.dev/warrden/warrden/-/compare/3.0.0...3.1.0
-[3.0.0]: https://code.neureka.dev/warrden/warrden/-/tags/3.0.0
-[2.1.3]: https://code.neureka.dev/warrden/warrden/-/compare/2.1.3...3.0.0
-[2.1.2]: https://code.neureka.dev/warrden/warrden/-/tags/2.1.2
-[2.1.1]: https://code.neureka.dev/warrden/warrden/-/tags/2.1.1
-[2.1.0]: https://code.neureka.dev/warrden/warrden/-/tags/2.1.0
-[2.0.1]: https://code.neureka.dev/warrden/warrden/-/tags/2.0.1
-[2.0.0]: https://code.neureka.dev/warrden/warrden/-/tags/2.0.0
-[1.1.0]: https://code.neureka.dev/warrden/warrden/-/tags/1.1.0
-[1.0.0]: https://code.neureka.dev/warrden/warrden/-/tags/1.0.0
+[4.3.1]: https://github.com/neurekadev/warrden/compare/4.3.0...4.3.1
+[4.3.0]: https://github.com/neurekadev/warrden/compare/4.2.0...4.3.0
+[4.2.0]: https://github.com/neurekadev/warrden/compare/4.1.4...4.2.0
+[4.1.4]: https://github.com/neurekadev/warrden/compare/4.1.3...4.1.4
+[4.1.3]: https://github.com/neurekadev/warrden/compare/4.1.2...4.1.3
+[4.1.2]: https://github.com/neurekadev/warrden/compare/4.1.1...4.1.2
+[4.1.1]: https://github.com/neurekadev/warrden/compare/4.1.0...4.1.1
+[4.1.0]: https://github.com/neurekadev/warrden/compare/4.0.2...4.1.0
+[4.0.2]: https://github.com/neurekadev/warrden/compare/4.0.1...4.0.2
+[4.0.1]: https://github.com/neurekadev/warrden/compare/4.0.0...4.0.1
+[4.0.0]: https://github.com/neurekadev/warrden/compare/3.1.0...4.0.0
+[3.1.0]: https://github.com/neurekadev/warrden/compare/3.0.0...3.1.0
+[3.0.0]: https://github.com/neurekadev/warrden/releases/tag/3.0.0
+[2.1.3]: https://github.com/neurekadev/warrden/compare/2.1.3...3.0.0
+[2.1.2]: https://github.com/neurekadev/warrden/releases/tag/2.1.2
+[2.1.1]: https://github.com/neurekadev/warrden/releases/tag/2.1.1
+[2.1.0]: https://github.com/neurekadev/warrden/releases/tag/2.1.0
+[2.0.1]: https://github.com/neurekadev/warrden/releases/tag/2.0.1
+[2.0.0]: https://github.com/neurekadev/warrden/releases/tag/2.0.0
+[1.1.0]: https://github.com/neurekadev/warrden/releases/tag/1.1.0
+[1.0.0]: https://github.com/neurekadev/warrden/releases/tag/1.0.0

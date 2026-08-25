@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"code.neureka.dev/warrden/warrden/internal/config"
+	"github.com/neurekadev/warrden/internal/config"
 )
 
 const (

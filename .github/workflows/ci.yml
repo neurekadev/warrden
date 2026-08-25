@@ -1,0 +1,285 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ghcr.io/neurekadev/warrden
+
+permissions:
+  contents: read
+
+jobs:
+  verify-go:
+    name: Verify Go
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Verify module files
+        run: |
+          go mod tidy -diff
+          go mod verify
+          go list -deps ./... >/dev/null
+
+      - name: Verify formatting
+        run: test -z "$(gofmt -l cmd internal)"
+
+      - name: Run vet
+        run: go vet ./...
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build packages
+        run: go build ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13.1
+
+      - name: Run staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.1 ./...
+
+      - name: Run vulnerability checks
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
+      - name: Run race tests
+        run: CGO_ENABLED=1 go test -race ./...
+
+      - name: Build Linux targets
+        run: |
+          GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$RUNNER_TEMP/warrden-linux-amd64" ./cmd/warrden
+          GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -o "$RUNNER_TEMP/warrden-linux-arm64" ./cmd/warrden
+
+  verify-container:
+    name: Verify container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Validate Compose configuration
+        run: |
+          cp .env.example .env
+          cp config.example.yaml config.yaml
+          docker compose config --quiet
+
+      - name: Build container targets
+        run: |
+          docker build --platform linux/arm64 -t warrden:container-test-arm64 .
+          docker build --platform linux/amd64 --build-arg GIT_TAG=container-test --build-arg GIT_HASH="$GITHUB_SHA" -t warrden:container-test .
+
+      - name: Verify container behavior
+        run: |
+          docker volume create warrden-container-test-data
+          docker create --name warrden-container-test-config-writer -v warrden-container-test-data:/app/data warrden:container-test
+          docker cp config.example.yaml warrden-container-test-config-writer:/app/data/config.yaml
+          docker rm warrden-container-test-config-writer
+          docker run --rm --entrypoint /app/bin/clear-missing -e PUID=1000 -e PGID=1000 -v warrden-container-test-data:/app/data warrden:container-test
+          docker run --rm --entrypoint /app/bin/clear-upgrades -e PUID=1000 -e PGID=1000 -v warrden-container-test-data:/app/data warrden:container-test
+          docker create --name warrden-container-test-files warrden:container-test
+          docker cp warrden-container-test-files:/etc/ssl/certs/ca-certificates.crt "$RUNNER_TEMP/ca-certificates.crt"
+          test -s "$RUNNER_TEMP/ca-certificates.crt"
+          docker rm warrden-container-test-files
+          docker run -d --name warrden-container-test-daemon -e PUID=1000 -e PGID=1000 -e TZ=America/Los_Angeles -v warrden-container-test-data:/app/data warrden:container-test
+          initialized=false
+          for attempt in $(seq 1 30); do
+            docker logs warrden-container-test-daemon >"$RUNNER_TEMP/warrden-container-test.log" 2>&1 || true
+            if grep -F "wArrden initialized" "$RUNNER_TEMP/warrden-container-test.log" >/dev/null; then
+              initialized=true
+              break
+            fi
+            sleep 1
+          done
+          test "$initialized" = true
+          docker logs warrden-container-test-daemon >"$RUNNER_TEMP/warrden-container-test.log" 2>&1
+          grep -E "Timezone.*America/Los_Angeles" "$RUNNER_TEMP/warrden-container-test.log" >/dev/null
+          docker stop --time 10 warrden-container-test-daemon
+          test "$(docker inspect --format '{{.State.ExitCode}}' warrden-container-test-daemon)" = "0"
+
+      - name: Clean up container tests
+        if: always()
+        run: |
+          docker rm -f warrden-container-test-daemon warrden-container-test-files warrden-container-test-config-writer 2>/dev/null || true
+          docker volume rm warrden-container-test-data 2>/dev/null || true
+
+  publish-edge:
+    name: Publish edge image
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    needs:
+      - verify-go
+      - verify-container
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Resolve image version
+        id: version
+        run: echo "value=edge-${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: type=raw,value=edge
+
+      - name: Build and publish image
+        id: image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          annotations: ${{ steps.metadata.outputs.annotations }}
+          build-args: |
+            GIT_TAG=${{ steps.version.outputs.value }}
+            GIT_HASH=${{ github.sha }}
+          cache-from: type=gha,scope=edge
+          cache-to: type=gha,mode=max,scope=edge
+
+      - name: Attest image provenance
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+
+  publish-release:
+    name: Publish release image
+    if: startsWith(github.ref, 'refs/tags/')
+    needs:
+      - verify-go
+      - verify-container
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Build and publish image
+        id: image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          annotations: ${{ steps.metadata.outputs.annotations }}
+          build-args: |
+            GIT_TAG=${{ github.ref_name }}
+            GIT_HASH=${{ github.sha }}
+          cache-from: type=gha,scope=release
+          cache-to: type=gha,mode=max,scope=release
+
+      - name: Attest image provenance
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+
+  release:
+    name: Create GitHub release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs:
+      - publish-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Extract release notes
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          awk -v version="$VERSION" '
+            $0 == "## [" version "]" || index($0, "## [" version "] - ") == 1 { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/release-notes.md"; then
+            printf 'Release %s\n' "$VERSION" > "$RUNNER_TEMP/release-notes.md"
+          fi
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"

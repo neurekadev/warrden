@@ -4,21 +4,18 @@
 
 # wArrden
 
-[![Release](https://img.shields.io/badge/dynamic/json?style=flat-square&logo=git&logoColor=F43F5E&label=Release&color=F43F5E&url=https://code.neureka.dev/api/v4/projects/1/releases&query=$[0].tag_name)](https://code.neureka.dev/warrden/warrden/-/releases)
-[![Pipeline](https://img.shields.io/badge/dynamic/json?style=flat-square&logo=gitlab&logoColor=8B5CF6&label=Pipeline&color=8B5CF6&url=https://code.neureka.dev/api/v4/projects/1/pipelines&query=$[0].status)](https://code.neureka.dev/warrden/warrden/-/pipelines)
-[![License](https://img.shields.io/github/license/NeurekaSoftware/wArrden?style=flat-square&label=License&color=14B8A6&logo=opensourceinitiative&logoColor=14B8A6)](./LICENSE.md)
-[![AI](https://img.shields.io/badge/AI-assisted-5786FE?style=flat-square&logo=deepseek&logoColor=5786FE)](https://code.neureka.dev/warrden/warrden)
-[![Stars](https://img.shields.io/github/stars/NeurekaSoftware/wArrden?style=flat-square&label=Stars&color=EAB308&logo=googlegemini&logoColor=EAB308)](https://code.neureka.dev/warrden/warrden)
+[![Release](https://img.shields.io/github/v/release/neurekadev/warrden?style=flat-square&label=Release&color=F43F5E&logo=github&logoColor=F43F5E)](https://github.com/neurekadev/warrden/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/neurekadev/warrden/ci.yml?branch=main&style=flat-square&label=CI&color=8B5CF6&logo=githubactions&logoColor=8B5CF6)](https://github.com/neurekadev/warrden/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/neurekadev/warrden?style=flat-square&label=License&color=14B8A6&logo=opensourceinitiative&logoColor=14B8A6)](./LICENSE.md)
+[![AI](https://img.shields.io/badge/AI-assisted-5786FE?style=flat-square&logo=deepseek&logoColor=5786FE)](https://github.com/neurekadev/warrden)
+[![Stars](https://img.shields.io/github/stars/neurekadev/warrden?style=flat-square&label=Stars&color=EAB308&logo=googlegemini&logoColor=EAB308)](https://github.com/neurekadev/warrden)
 
 wArrden makes it easy to maintain your media libraries by finding missing or upgradeable content, as well as detecting and clearing stuck imports from supported arr queues.
 
 </div>
 
-> [!WARNING]
-> The container registry has changed. Please update your image from `code.neureka.dev/warrden/warrden` to `registry.neureka.dev/warrden/warrden`.
-
-> [!IMPORTANT]  
-> This repository's GitHub mirror is for reference only. Please submit bug reports and feature requests to our [official GitLab repository](https://code.neureka.dev/warrden/warrden).
+> [!CAUTION]
+> Images at `registry.neureka.dev/warrden/warrden` are no longer updated. Use `ghcr.io/neurekadev/warrden`.
 
 ## Quickstart
 
@@ -28,14 +25,14 @@ wArrden makes it easy to maintain your media libraries by finding missing or upg
 1. Download `compose.yaml` and the environment template:
 
    ```
-   curl -O https://code.neureka.dev/warrden/warrden/-/raw/main/compose.yaml
-   curl -o .env https://code.neureka.dev/warrden/warrden/-/raw/main/.env.example
+   curl -O https://raw.githubusercontent.com/neurekadev/warrden/refs/heads/main/compose.yaml
+   curl -o .env https://raw.githubusercontent.com/neurekadev/warrden/refs/heads/main/.env.example
    ```
 
 2. Download the example config as `config.yaml`, then edit it with your Sonarr/Radarr URLs and API keys:
 
    ```
-   curl -o config.yaml https://code.neureka.dev/warrden/warrden/-/raw/main/config.example.yaml
+   curl -o config.yaml https://raw.githubusercontent.com/neurekadev/warrden/refs/heads/main/config.example.yaml
    ```
 
 3. Start the container:

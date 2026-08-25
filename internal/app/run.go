@@ -14,17 +14,17 @@ import (
 	"sync"
 	"time"
 
-	"code.neureka.dev/warrden/warrden/internal/arr"
-	"code.neureka.dev/warrden/warrden/internal/config"
-	"code.neureka.dev/warrden/warrden/internal/cooldown"
-	"code.neureka.dev/warrden/warrden/internal/health"
-	"code.neureka.dev/warrden/warrden/internal/identity"
-	"code.neureka.dev/warrden/warrden/internal/output"
-	"code.neureka.dev/warrden/warrden/internal/queue"
-	"code.neureka.dev/warrden/warrden/internal/schedule"
-	"code.neureka.dev/warrden/warrden/internal/search"
-	"code.neureka.dev/warrden/warrden/internal/tag"
-	"code.neureka.dev/warrden/warrden/internal/telemetry"
+	"github.com/neurekadev/warrden/internal/arr"
+	"github.com/neurekadev/warrden/internal/config"
+	"github.com/neurekadev/warrden/internal/cooldown"
+	"github.com/neurekadev/warrden/internal/health"
+	"github.com/neurekadev/warrden/internal/identity"
+	"github.com/neurekadev/warrden/internal/output"
+	"github.com/neurekadev/warrden/internal/queue"
+	"github.com/neurekadev/warrden/internal/schedule"
+	"github.com/neurekadev/warrden/internal/search"
+	"github.com/neurekadev/warrden/internal/tag"
+	"github.com/neurekadev/warrden/internal/telemetry"
 )
 
 const telemetryShutdownTimeout = 3 * time.Second

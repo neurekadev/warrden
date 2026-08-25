@@ -17,6 +17,7 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	}
 	composeText := strings.ReplaceAll(string(compose), "\r\n", "\n")
 	for _, want := range []string{
+		"image: ghcr.io/neurekadev/warrden:4",
 		"env_file:\n      - .env",
 		"data:/app/data",
 		"./config.yaml:/app/data/config.yaml",
@@ -84,15 +85,50 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		}
 	}
 
-	pipeline := readRepositoryFile(t, "../../.gitlab-ci.yml")
-	var pipelineDocument yaml.Node
-	if err := yaml.Unmarshal(pipeline, &pipelineDocument); err != nil {
-		t.Fatalf(".gitlab-ci.yml: %v", err)
-	}
-	pipelineText := string(pipeline)
+	readme := string(readRepositoryFile(t, "../../README.md"))
 	for _, want := range []string{
+		"https://github.com/neurekadev/warrden",
+		"https://raw.githubusercontent.com/neurekadev/warrden/refs/heads/main/compose.yaml",
+		"> [!CAUTION]",
+		"Images at `registry.neureka.dev/warrden/warrden` are no longer updated. Use `ghcr.io/neurekadev/warrden`.",
+	} {
+		if !strings.Contains(readme, want) {
+			t.Errorf("README.md missing %q", want)
+		}
+	}
+	for _, forbidden := range []string{"code.neureka.dev", "NeurekaSoftware/wArrden", "official GitLab repository"} {
+		if strings.Contains(readme, forbidden) {
+			t.Errorf("README.md contains retired repository reference %q", forbidden)
+		}
+	}
+
+	changelog := string(readRepositoryFile(t, "../../CHANGELOG.md"))
+	if strings.Contains(changelog, "https://code.neureka.dev") {
+		t.Error("CHANGELOG.md contains retired repository links")
+	}
+	if !strings.Contains(changelog, "[Unreleased]: https://github.com/neurekadev/warrden/compare/") {
+		t.Error("CHANGELOG.md must compare releases in the GitHub repository")
+	}
+
+	module := string(readRepositoryFile(t, "../../go.mod"))
+	if !strings.HasPrefix(module, "module github.com/neurekadev/warrden\n") {
+		t.Error("go.mod must use the GitHub repository module path")
+	}
+
+	workflow := readRepositoryFile(t, "../../.github/workflows/ci.yml")
+	var workflowDocument yaml.Node
+	if err := yaml.Unmarshal(workflow, &workflowDocument); err != nil {
+		t.Fatalf(".github/workflows/ci.yml: %v", err)
+	}
+	workflowText := string(workflow)
+	for _, want := range []string{
+		"pull_request:",
+		"workflow_dispatch:",
+		"actions/checkout@v7",
+		"actions/setup-go@v7",
 		"go mod tidy -diff",
-		"golangci-lint@v2.13.1",
+		"golangci/golangci-lint-action@v9",
+		"version: v2.13.1",
 		"govulncheck@v1.7.0",
 		"CGO_ENABLED=1 go test -race ./...",
 		"docker compose config --quiet",
@@ -102,18 +138,42 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		"America/Los_Angeles",
 		"ca-certificates.crt",
 		"docker stop --time 10",
+		"ghcr.io/neurekadev/warrden",
+		"docker/setup-qemu-action@v4",
+		"docker/setup-buildx-action@v4",
+		"docker/login-action@v4",
+		"docker/metadata-action@v6",
+		"docker/build-push-action@v7",
+		"actions/attest@v4",
+		"type=raw,value=latest",
+		"packages: write",
+		"attestations: write",
+		"artifact-metadata: write",
+		"contents: write",
+		"gh release create",
 	} {
-		if !strings.Contains(pipelineText, want) {
-			t.Errorf(".gitlab-ci.yml missing %q", want)
+		if !strings.Contains(workflowText, want) {
+			t.Errorf(".github/workflows/ci.yml missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"CONFIG_PATH=", "DATABASE_PATH=", "warden.db", "warrden-container-test-config:/config"} {
-		if strings.Contains(pipelineText, forbidden) {
-			t.Errorf(".gitlab-ci.yml contains removed runtime setting %q", forbidden)
+	for _, forbidden := range []string{
+		"CONFIG_PATH=",
+		"DATABASE_PATH=",
+		"warden.db",
+		"warrden-container-test-config:/config",
+		"$CI_",
+		"code.neureka.dev",
+		"registry.neureka.dev",
+	} {
+		if strings.Contains(workflowText, forbidden) {
+			t.Errorf(".github/workflows/ci.yml contains forbidden value %q", forbidden)
 		}
 	}
-	if strings.Contains(pipelineText, "$CI_PROJECT_DIR") {
+	if strings.Contains(workflowText, "$CI_PROJECT_DIR") {
 		t.Error("container smoke tests must not bind runner-local paths through the host Docker daemon")
+	}
+	if _, err := os.Stat("../../.gitlab-ci.yml"); !os.IsNotExist(err) {
+		t.Errorf(".gitlab-ci.yml must be removed, stat error: %v", err)
 	}
 }
 

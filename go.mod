@@ -1,4 +1,4 @@
-module code.neureka.dev/warrden/warrden
+module github.com/neurekadev/warrden
 
 go 1.27
 

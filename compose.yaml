@@ -1,6 +1,6 @@
 services:
   warrden:
-    image: registry.neureka.dev/warrden/warrden:4
+    image: ghcr.io/neurekadev/warrden:4
     container_name: warrden
     env_file:
       - .env

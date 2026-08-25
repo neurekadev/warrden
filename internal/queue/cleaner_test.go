@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"code.neureka.dev/warrden/warrden/internal/arr"
-	"code.neureka.dev/warrden/warrden/internal/config"
-	"code.neureka.dev/warrden/warrden/internal/output"
+	"github.com/neurekadev/warrden/internal/arr"
+	"github.com/neurekadev/warrden/internal/config"
+	"github.com/neurekadev/warrden/internal/output"
 )
 
 type fakeClient struct {

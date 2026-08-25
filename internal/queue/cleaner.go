@@ -7,10 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	"code.neureka.dev/warrden/warrden/internal/arr"
-	"code.neureka.dev/warrden/warrden/internal/config"
-	"code.neureka.dev/warrden/warrden/internal/matcher"
-	"code.neureka.dev/warrden/warrden/internal/output"
+	"github.com/neurekadev/warrden/internal/arr"
+	"github.com/neurekadev/warrden/internal/config"
+	"github.com/neurekadev/warrden/internal/matcher"
+	"github.com/neurekadev/warrden/internal/output"
 )
 
 type client interface {

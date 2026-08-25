@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"code.neureka.dev/warrden/warrden/internal/matcher"
+	"github.com/neurekadev/warrden/internal/matcher"
 	"go.yaml.in/yaml/v3"
 )
 

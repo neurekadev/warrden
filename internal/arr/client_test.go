@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"code.neureka.dev/warrden/warrden/internal/config"
+	"github.com/neurekadev/warrden/internal/config"
 )
 
 func TestQueuePaginatesAndDeduplicates(t *testing.T) {

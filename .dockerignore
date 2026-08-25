@@ -2,7 +2,7 @@
 .gitignore
 .env
 .gitattributes
-.gitlab-ci.yml
+.github/
 **/bin/
 **/obj/
 **/*.user

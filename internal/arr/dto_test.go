@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"code.neureka.dev/warrden/warrden/internal/config"
+	"github.com/neurekadev/warrden/internal/config"
 )
 
 func TestHTTPDTOsConvertWithoutLeakingTagsIntoDomain(t *testing.T) {

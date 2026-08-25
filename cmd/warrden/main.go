@@ -7,7 +7,7 @@ import (
 	"syscall"
 	_ "time/tzdata"
 
-	"code.neureka.dev/warrden/warrden/internal/app"
+	"github.com/neurekadev/warrden/internal/app"
 )
 
 func main() { os.Exit(run()) }
