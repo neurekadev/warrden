@@ -12,9 +12,12 @@ import (
 // Scheduler owns all configured cron jobs.
 type Scheduler struct{ scheduler gocron.Scheduler }
 
-// New creates a scheduler in location.
+// New creates a scheduler in location that queues jobs for serial execution.
 func New(location *time.Location) (*Scheduler, error) {
-	scheduler, err := gocron.NewScheduler(gocron.WithLocation(location))
+	scheduler, err := gocron.NewScheduler(
+		gocron.WithLocation(location),
+		gocron.WithLimitConcurrentJobs(1, gocron.LimitModeWait),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create scheduler: %w", err)
 	}

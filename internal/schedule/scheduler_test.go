@@ -72,3 +72,87 @@ func TestSchedulerPreventsOverlappingInvocations(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSchedulerQueuesDifferentJobsAndRunsSerially(t *testing.T) {
+	scheduler, err := New(time.UTC)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	release := make(chan struct{})
+	completed := make(chan string, 2)
+	started := make(chan string, 2)
+	var active atomic.Int32
+	var overlap atomic.Bool
+	task := func(name string) func(context.Context) error {
+		return func(context.Context) error {
+			if active.Add(1) != 1 {
+				overlap.Store(true)
+			}
+			defer active.Add(-1)
+			started <- name
+			<-release
+			completed <- name
+			return nil
+		}
+	}
+
+	for _, name := range []string{"first", "second"} {
+		if err := scheduler.add(name, gocron.OneTimeJob(gocron.OneTimeJobStartImmediately()), task(name), nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	scheduler.Start()
+	defer func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		if err := scheduler.Shutdown(ctx); err != nil {
+			t.Errorf("shutdown scheduler: %v", err)
+		}
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("first job did not start")
+	}
+
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.NewTimer(time.Second)
+	defer timeout.Stop()
+	for scheduler.scheduler.JobsWaitingInQueue() != 1 {
+		select {
+		case <-ticker.C:
+		case <-timeout.C:
+			t.Fatalf("got %d queued jobs, want one", scheduler.scheduler.JobsWaitingInQueue())
+		}
+	}
+
+	if got := active.Load(); got != 1 {
+		t.Fatalf("got %d active jobs while one was queued, want one", got)
+	}
+	close(release)
+
+	finished := make(map[string]bool, 2)
+	for len(finished) < 2 {
+		select {
+		case name := <-completed:
+			finished[name] = true
+		case <-time.After(time.Second):
+			t.Fatalf("completed jobs %v, want first and second", finished)
+		}
+	}
+	if !finished["first"] || !finished["second"] {
+		t.Fatalf("completed jobs %v, want first and second", finished)
+	}
+	if overlap.Load() {
+		t.Fatal("jobs overlapped")
+	}
+}
