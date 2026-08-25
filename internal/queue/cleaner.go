@@ -91,21 +91,24 @@ func (c *Cleaner) Run(ctx context.Context) (int, error) {
 }
 
 func match(item arr.QueueItem, rules []config.Rule, kind string) (config.Rule, bool) {
-	contains := func(value, pattern string) bool {
+	matches := func(key, value, pattern string) bool {
+		if key == "SAMPLE" {
+			return strings.EqualFold(strings.TrimSpace(value), pattern)
+		}
 		return strings.Contains(strings.ToLower(value), strings.ToLower(pattern))
 	}
 	for _, rule := range rules {
 		patterns := matcher.Patterns(rule.Match, kind)
 		for _, pattern := range patterns {
-			if nonblank(item.ErrorMessage) && contains(*item.ErrorMessage, pattern) {
+			if nonblank(item.ErrorMessage) && matches(rule.Match, *item.ErrorMessage, pattern) {
 				return rule, true
 			}
 			for _, status := range item.StatusMessages {
-				if status.Title != nil && contains(*status.Title, pattern) {
+				if status.Title != nil && matches(rule.Match, *status.Title, pattern) {
 					return rule, true
 				}
 				for _, message := range status.Messages {
-					if contains(message, pattern) {
+					if matches(rule.Match, message, pattern) {
 						return rule, true
 					}
 				}

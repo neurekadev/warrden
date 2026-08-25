@@ -113,11 +113,26 @@ func TestParseExample(t *testing.T) {
 	if got, want := len(cfg.Instances), 5; got != want {
 		t.Fatalf("instances=%d, want %d", got, want)
 	}
-	checks := map[string][2]int{"sonarr": {len(cfg.QueueRules.Sonarr), 28}, "radarr": {len(cfg.QueueRules.Radarr), 19}, "lidarr": {len(cfg.QueueRules.Lidarr), 25}, "whisparr": {len(cfg.QueueRules.Whisparr), 29}}
-	for name, check := range checks {
-		if check[0] != check[1] {
-			t.Errorf("%s rules=%d, want %d", name, check[0], check[1])
+	rulesByKind := map[string][]Rule{"sonarr": cfg.QueueRules.Sonarr, "radarr": cfg.QueueRules.Radarr, "lidarr": cfg.QueueRules.Lidarr, "whisparr": cfg.QueueRules.Whisparr}
+	wantCounts := map[string]int{"sonarr": 29, "radarr": 20, "lidarr": 26, "whisparr": 30}
+	for kind, rules := range rulesByKind {
+		if len(rules) != wantCounts[kind] {
+			t.Errorf("%s rules=%d, want %d", kind, len(rules), wantCounts[kind])
 		}
+		actions := make(map[string]Action, len(rules))
+		for _, rule := range rules {
+			actions[rule.Match] = rule.Action
+		}
+		if got := actions["SAMPLE"]; got != RemoveAndBlocklist {
+			t.Errorf("%s SAMPLE action=%q, want %q", kind, got, RemoveAndBlocklist)
+		}
+		if got := actions["SAMPLE_INDETERMINATE"]; got != None {
+			t.Errorf("%s SAMPLE_INDETERMINATE action=%q, want %q", kind, got, None)
+		}
+	}
+	warning := "# WARNING: Stale rclone/FUSE mounts or other network storage read failures can trigger this for healthy files."
+	if got := strings.Count(string(data), warning); got != len(rulesByKind) {
+		t.Errorf("SAMPLE_INDETERMINATE config warnings=%d, want %d", got, len(rulesByKind))
 	}
 	if cfg.Instances[0].APIVersion != "v3" {
 		t.Errorf("apiVersion=%q", cfg.Instances[0].APIVersion)

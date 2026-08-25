@@ -93,6 +93,33 @@ func TestConfigurationWarnings(t *testing.T) {
 	}
 }
 
+func TestSampleIndeterminateActionWarning(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		action string
+		warn   bool
+	}{
+		{"none", false},
+		{"remove", true},
+		{"removeAndBlocklist", true},
+	}
+	for _, test := range tests {
+		t.Run(test.action, func(t *testing.T) {
+			t.Parallel()
+			yamlText := validSonarrConfig + "queueCleanupRules:\n  sonarr:\n    - match: SAMPLE_INDETERMINATE\n      action: " + test.action + "\n"
+			cfg, err := parse([]byte(yamlText))
+			if err != nil {
+				t.Fatal(err)
+			}
+			warnings := strings.Join(cfg.Warnings(), "\n")
+			got := strings.Contains(warnings, "transient rclone/FUSE or network storage read failures")
+			if got != test.warn {
+				t.Fatalf("warning present=%t, want %t:\n%s", got, test.warn, warnings)
+			}
+		})
+	}
+}
+
 func TestConfigurationDefaults(t *testing.T) {
 	t.Parallel()
 	for _, prefix := range []string{"", "logLevel: ''\n"} {

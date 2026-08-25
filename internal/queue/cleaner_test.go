@@ -102,6 +102,47 @@ func TestCleanerDryRunDoesNotDelete(t *testing.T) {
 	}
 }
 
+func TestCleanerSeparatesConfirmedAndIndeterminateSamples(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		rules     []config.Rule
+		matched   int
+		deletions []deleteCall
+	}{
+		{
+			name:      "confirmed sample rule ignores indeterminate result",
+			rules:     []config.Rule{{Match: "SAMPLE", Action: config.RemoveAndBlocklist}},
+			matched:   0,
+			deletions: nil,
+		},
+		{
+			name:      "explicit indeterminate rule blocklists result",
+			rules:     []config.Rule{{Match: "SAMPLE_INDETERMINATE", Action: config.RemoveAndBlocklist}},
+			matched:   1,
+			deletions: []deleteCall{{id: 1, blocklist: true}},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			client := &fakeClient{items: []arr.QueueItem{{ID: 1, ErrorMessage: stringPointer("Unable to determine if file is a sample"), Title: stringPointer("release")}}}
+			var buffer bytes.Buffer
+			out := output.New(&buffer, output.Info, time.UTC, nil)
+			matched, err := New(client, config.Sonarr, false, test.rules, out).Run(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if matched != test.matched {
+				t.Errorf("matched=%d, want %d", matched, test.matched)
+			}
+			if !reflect.DeepEqual(client.deletes, test.deletions) {
+				t.Errorf("deletes=%v, want %v", client.deletes, test.deletions)
+			}
+		})
+	}
+}
+
 func TestCleanerExcludesFailedDeletionsFromResults(t *testing.T) {
 	t.Parallel()
 	client := &fakeClient{failID: 1, items: []arr.QueueItem{{ID: 1, ErrorMessage: stringPointer("Sample"), Title: stringPointer("release")}}}

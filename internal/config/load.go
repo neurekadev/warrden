@@ -293,6 +293,9 @@ func validateRules(raw *rawConfig, warnings *[]string) []string {
 			} else if !equalFoldAny(action, string(Remove), string(RemoveAndBlocklist), string(None)) {
 				errors = append(errors, fmt.Sprintf("%s: 'action' must be 'remove', 'removeAndBlocklist', or 'none', got '%s'.", prefix, rule.Action))
 			}
+			if rule.Match == "SAMPLE_INDETERMINATE" && equalFoldAny(action, string(Remove), string(RemoveAndBlocklist)) {
+				*warnings = append(*warnings, fmt.Sprintf("%s: SAMPLE_INDETERMINATE uses action '%s' — transient rclone/FUSE or network storage read failures can remove or blocklist healthy downloads; use 'none' unless this risk is acceptable.", prefix, rule.Action))
+			}
 		}
 	}
 	return errors

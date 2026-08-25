@@ -17,7 +17,8 @@ func TestApplicationSpecificPatterns(t *testing.T) {
 		{"MATCHED_VIA_GRAB_HISTORY", "whisparr", []string{"Found matching series via grab history", "Found matching movie via grab history"}},
 		{"EPISODE_UNEXPECTED_FOLDER", "sonarr", []string{"was unexpected considering the", "were unexpected considering the"}},
 		{"ALBUM_ALREADY_IMPORTED", "sonarr", nil},
-		{"SAMPLE", "whisparr", []string{"Sample", "Unable to determine if file is a sample"}},
+		{"SAMPLE", "whisparr", []string{"Sample"}},
+		{"SAMPLE_INDETERMINATE", "whisparr", []string{"Unable to determine if file is a sample"}},
 	}
 	for _, test := range tests {
 		if got := Patterns(test.key, test.kind); !reflect.DeepEqual(got, test.want) {

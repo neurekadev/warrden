@@ -553,9 +553,15 @@ queueCleanupRules:
   radarr:
     # The file is a short sample/clip, not the full movie.
     # Radarr: "Sample"
-    # Radarr: "Unable to determine if file is a sample"
     - match: SAMPLE
       action: removeAndBlocklist
+
+    # Media probing failed, so the arr could not determine whether the file is a sample.
+    # WARNING: Stale rclone/FUSE mounts or other network storage read failures can trigger this for healthy files.
+    # Keep this rule set to none unless removing healthy downloads after transient read failures is acceptable.
+    # Radarr: "Unable to determine if file is a sample"
+    - match: SAMPLE_INDETERMINATE
+      action: none
 
     # No files in the download could be imported.
     # Radarr: "No files found are eligible for import in {0}"
@@ -651,9 +657,15 @@ queueCleanupRules:
   sonarr:
     # The file is a short sample/clip, not the full episode.
     # Sonarr: "Sample"
-    # Sonarr: "Unable to determine if file is a sample"
     - match: SAMPLE
       action: removeAndBlocklist
+
+    # Media probing failed, so the arr could not determine whether the file is a sample.
+    # WARNING: Stale rclone/FUSE mounts or other network storage read failures can trigger this for healthy files.
+    # Keep this rule set to none unless removing healthy downloads after transient read failures is acceptable.
+    # Sonarr: "Unable to determine if file is a sample"
+    - match: SAMPLE_INDETERMINATE
+      action: none
 
     # No files in the download could be imported.
     # Sonarr: "No files found are eligible for import in {0}"
@@ -796,9 +808,15 @@ queueCleanupRules:
   lidarr:
     # The file is a short sample/clip, not the full album.
     # Lidarr: "Sample"
-    # Lidarr: "Unable to determine if file is a sample"
     - match: SAMPLE
       action: removeAndBlocklist
+
+    # Media probing failed, so the arr could not determine whether the file is a sample.
+    # WARNING: Stale rclone/FUSE mounts or other network storage read failures can trigger this for healthy files.
+    # Keep this rule set to none unless removing healthy downloads after transient read failures is acceptable.
+    # Lidarr: "Unable to determine if file is a sample"
+    - match: SAMPLE_INDETERMINATE
+      action: none
 
     # No files in the download could be imported.
     # Lidarr: "No files found are eligible for import in {0}"
@@ -925,9 +943,15 @@ queueCleanupRules:
   whisparr:
     # The file is a short sample/clip, not the full item.
     # Whisparr: "Sample"
-    # Whisparr: "Unable to determine if file is a sample"
     - match: SAMPLE
       action: removeAndBlocklist
+
+    # Media probing failed, so the arr could not determine whether the file is a sample.
+    # WARNING: Stale rclone/FUSE mounts or other network storage read failures can trigger this for healthy files.
+    # Keep this rule set to none unless removing healthy downloads after transient read failures is acceptable.
+    # Whisparr: "Unable to determine if file is a sample"
+    - match: SAMPLE_INDETERMINATE
+      action: none
 
     # No files in the download could be imported.
     # Whisparr: "No files found are eligible for import in {0}"

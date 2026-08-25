@@ -5,7 +5,7 @@ package matcher
 // Valid reports whether key names a registered matcher.
 func Valid(key string) bool {
 	switch key {
-	case "SAMPLE", "NO_FILES_ELIGIBLE", "NOT_CUSTOM_FORMAT_UPGRADE", "NO_AUDIO_TRACKS",
+	case "SAMPLE", "SAMPLE_INDETERMINATE", "NO_FILES_ELIGIBLE", "NOT_CUSTOM_FORMAT_UPGRADE", "NO_AUDIO_TRACKS",
 		"ARCHIVE_FILE", "INSUFFICIENT_FREE_SPACE", "FILE_UNPACKING", "UNABLE_TO_PARSE",
 		"UNEXPECTED_ERROR", "LOCKED_FILE", "UNSUPPORTED_EXTENSION", "DOWNLOAD_CLIENT_ERROR",
 		"IMPORT_PATH_INACCESSIBLE", "NOT_QUALITY_UPGRADE", "NOT_REVISION_UPGRADE", "DANGEROUS_FILE",
@@ -26,7 +26,9 @@ func Valid(key string) bool {
 func Patterns(key, kind string) []string {
 	switch key {
 	case "SAMPLE":
-		return forAll(kind, "Sample", "Unable to determine if file is a sample")
+		return forAll(kind, "Sample")
+	case "SAMPLE_INDETERMINATE":
+		return forAll(kind, "Unable to determine if file is a sample")
 	case "NO_FILES_ELIGIBLE":
 		return forAll(kind, "No files found are eligible")
 	case "NOT_CUSTOM_FORMAT_UPGRADE":
