@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-08-25
+
+### Fixed
+- Separate confirmed samples from indeterminate media checks so transient rclone/FUSE or network storage failures do not remove or blocklist healthy downloads by default.
+
 ## [5.0.0] - 2026-08-25
 
 ### Changed
@@ -232,7 +237,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cooldown system to avoid re-searching the same items too frequently
 - Support for both Radarr and Sonarr instances with independent configuration per job type
 - Structured console output with item counts, cooldown status, and result summaries
-[Unreleased]: https://github.com/neurekadev/warrden/compare/5.0.0...HEAD
+[Unreleased]: https://github.com/neurekadev/warrden/compare/5.0.1...HEAD
+[5.0.1]: https://github.com/neurekadev/warrden/compare/5.0.0...5.0.1
 [5.0.0]: https://github.com/neurekadev/warrden/compare/4.6.0...5.0.0
 [4.6.0]: https://github.com/neurekadev/warrden/compare/4.5.0...4.6.0
 [4.5.0]: https://github.com/neurekadev/warrden/compare/4.4.0...4.5.0
