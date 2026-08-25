@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-08-25
+
+### Changed
+- Rewrite wArrden in Go and optimize its container runtime, reducing the image footprint by about 88% and measured memory usage by about 86%.
+- Move official releases and multi-architecture container images to GitHub and `ghcr.io/neurekadev/warrden`, with verifiable build provenance.
+- Update Compose deployments to use the v5 image, load runtime settings from `.env`, and mount `config.yaml` under `/app/data`.
+- Use a 90-day upgrade-search cooldown in the example configuration instead of 30 days.
+- Require `PUID` and `PGID` to be valid, supplied together, and either both zero or both non-zero.
+- Expand telemetry to include anonymous lifecycle events and allow all telemetry to be disabled with `TELEMETRY=false`.
+
+### Removed
+- Remove the `APP_VERSION`, `CONFIG_PATH`, and `DATABASE_PATH` environment overrides; wArrden now reads its version from the image and keeps configuration and data under `/app/data`.
+- Remove the bundled shell and .NET runtime from the container image.
+- Reset saved 4.x search cooldown history during the first 5.0 startup because it cannot be carried into the new Go runtime.
+
+### Fixed
+- Restore automatic unexpected-error reporting through the current Beacon service.
+- Run one scheduled job at a time so tree-structured log output cannot interleave.
+
 ## [4.6.0] - 2026-07-24
 
 ### Added
@@ -213,7 +232,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cooldown system to avoid re-searching the same items too frequently
 - Support for both Radarr and Sonarr instances with independent configuration per job type
 - Structured console output with item counts, cooldown status, and result summaries
-[Unreleased]: https://github.com/neurekadev/warrden/compare/4.6.0...HEAD
+[Unreleased]: https://github.com/neurekadev/warrden/compare/5.0.0...HEAD
+[5.0.0]: https://github.com/neurekadev/warrden/compare/4.6.0...5.0.0
 [4.6.0]: https://github.com/neurekadev/warrden/compare/4.5.0...4.6.0
 [4.5.0]: https://github.com/neurekadev/warrden/compare/4.4.0...4.5.0
 [4.4.0]: https://github.com/neurekadev/warrden/compare/4.3.1...4.4.0
