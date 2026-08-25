@@ -195,6 +195,60 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	if got := strings.Count(workflowText, "push-to-registry: false"); got != 2 {
 		t.Errorf("expected registry attestation publishing to be disabled for edge and release images, got %d", got)
 	}
+
+	dependabot := readRepositoryFile(t, "../../.github/dependabot.yml")
+	var dependabotDocument struct {
+		Version int `yaml:"version"`
+		Updates []struct {
+			PackageEcosystem string `yaml:"package-ecosystem"`
+			Directory        string `yaml:"directory"`
+			Schedule         struct {
+				Interval string `yaml:"interval"`
+				Day      string `yaml:"day"`
+				Time     string `yaml:"time"`
+				Timezone string `yaml:"timezone"`
+			} `yaml:"schedule"`
+		} `yaml:"updates"`
+	}
+	if err := yaml.Unmarshal(dependabot, &dependabotDocument); err != nil {
+		t.Fatalf(".github/dependabot.yml: %v", err)
+	}
+	if dependabotDocument.Version != 2 {
+		t.Errorf(".github/dependabot.yml version=%d, want 2", dependabotDocument.Version)
+	}
+	wantEcosystems := map[string]bool{
+		"docker":         true,
+		"github-actions": true,
+		"gomod":          true,
+	}
+	seenEcosystems := make(map[string]bool, len(wantEcosystems))
+	for _, update := range dependabotDocument.Updates {
+		if !wantEcosystems[update.PackageEcosystem] {
+			t.Errorf(".github/dependabot.yml contains unexpected ecosystem %q", update.PackageEcosystem)
+			continue
+		}
+		if seenEcosystems[update.PackageEcosystem] {
+			t.Errorf(".github/dependabot.yml contains duplicate ecosystem %q", update.PackageEcosystem)
+		}
+		seenEcosystems[update.PackageEcosystem] = true
+		if update.Directory != "/" {
+			t.Errorf("dependabot %s directory=%q, want %q", update.PackageEcosystem, update.Directory, "/")
+		}
+		if update.Schedule.Interval != "weekly" || update.Schedule.Day != "monday" || update.Schedule.Time != "07:00" || update.Schedule.Timezone != "America/Los_Angeles" {
+			t.Errorf("dependabot %s schedule=%+v, want Monday at 07:00 America/Los_Angeles", update.PackageEcosystem, update.Schedule)
+		}
+	}
+	for ecosystem := range wantEcosystems {
+		if !seenEcosystems[ecosystem] {
+			t.Errorf(".github/dependabot.yml missing ecosystem %q", ecosystem)
+		}
+	}
+	if got := len(dependabotDocument.Updates); got != len(wantEcosystems) {
+		t.Errorf(".github/dependabot.yml update count=%d, want %d", got, len(wantEcosystems))
+	}
+	if _, err := os.Stat("../../renovate.json"); !os.IsNotExist(err) {
+		t.Errorf("renovate.json must be removed, stat error: %v", err)
+	}
 	if _, err := os.Stat("../../.gitlab-ci.yml"); !os.IsNotExist(err) {
 		t.Errorf(".gitlab-ci.yml must be removed, stat error: %v", err)
 	}
