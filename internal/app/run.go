@@ -121,27 +121,30 @@ func run(ctx context.Context, args []string, stdout io.Writer, dependencies runD
 		out.Debug("warden.database", "Renamed legacy database to "+databasePath)
 	}
 
-	installPath, err := filepath.Abs(installIDPath)
-	if err != nil {
-		out.Warn("warden.telemetry", "Telemetry disabled — installation ID path is invalid", err.Error())
-	}
-	installID := ""
-	if err == nil {
-		installID, err = dependencies.loadInstallID(installPath)
+	var analytics lifecycleAnalytics
+	if opts.TelemetryEnabled {
+		installPath, err := filepath.Abs(installIDPath)
 		if err != nil {
-			out.Warn("warden.telemetry", "Telemetry disabled — installation ID is unavailable", err.Error())
+			out.Warn("warden.telemetry", "Telemetry disabled — installation ID path is invalid", err.Error())
 		}
+		installID := ""
+		if err == nil {
+			installID, err = dependencies.loadInstallID(installPath)
+			if err != nil {
+				out.Warn("warden.telemetry", "Telemetry disabled — installation ID is unavailable", err.Error())
+			}
+		}
+		environment := deploymentEnvironment(opts.AppVersion)
+		reporter := dependencies.newReporter(opts.AppVersion, environment, installID)
+		defer func() {
+			flushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+			defer cancel()
+			reporter.Flush(flushCtx)
+		}()
+		defer reporter.Recover()
+		out = output.New(stdout, output.ParseLevel(cfg.LogLevel), location, reporter)
+		analytics = dependencies.newAnalytics(installID, opts.AppVersion, runtime.GOOS+"-"+runtime.GOARCH, out)
 	}
-	environment := deploymentEnvironment(opts.AppVersion)
-	reporter := dependencies.newReporter(opts.AppVersion, environment, installID)
-	defer func() {
-		flushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
-		defer cancel()
-		reporter.Flush(flushCtx)
-	}()
-	defer reporter.Recover()
-	out = output.New(stdout, output.ParseLevel(cfg.LogLevel), location, reporter)
-	analytics := dependencies.newAnalytics(installID, opts.AppVersion, runtime.GOOS+"-"+runtime.GOARCH, out)
 
 	args = aliasArgs(args)
 	if len(args) > 0 {

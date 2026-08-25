@@ -70,14 +70,6 @@ Periodically searches for monitored content that already exists on disk but has 
 
 Detects stuck imports caused by common errors (wrong episode, not an upgrade, sample, corrupt file) and removes or blocklists them so the same release won't download again.
 
-## Telemetry
-
-wArrden reports unexpected application errors and anonymous installation lifecycle
-events to the project's Beacon service. A random installation UUID is generated once
-in `data/install-id` and reused after container recreation; Beacon hashes that ID during
-analytics ingestion. Install analytics contain only lifecycle event names, timestamps,
-the wArrden release, the runtime platform, and clean-shutdown duration and reason.
-
 ## Why Use wArrden?
 
 Radarr and Sonarr primarily rely on RSS feeds to detect newly uploaded releases every 15 minutes. While this works well for new uploads, many users assume it also continuously searches and reevaluates their entire library — it does not.
@@ -91,3 +83,9 @@ This creates a few common gaps in automation:
 Over time, this can leave libraries with permanently missing content or media that no longer matches your preferred quality and scoring standards.
 
 wArrden fills those gaps by periodically rechecking your library and automating the cleanup work that would otherwise require manual intervention.
+
+## Telemetry
+
+wArrden automatically reports unexpected application errors and anonymous lifecycle events. Automatic error reporting helps fix bugs faster without requiring any action from you. Telemetry is stored on official Neureka.Dev servers and is never provided to third parties.
+
+To disable error reporting and anonymous lifecycle analytics, add `TELEMETRY=false` to your `.env` file and restart wArrden.

@@ -84,6 +84,48 @@ func TestRunReportsUnknownCommandOnStdout(t *testing.T) {
 	}
 }
 
+func TestRunTelemetryOptOutSkipsInstallationAndReporters(t *testing.T) {
+	directory := prepareRunTest(t)
+	t.Setenv("TELEMETRY", " FaLsE ")
+	installPath := filepath.Join(directory, "data", "install-id")
+	wantInstallID := []byte("f08e267c-9070-4f3a-a485-5fcfa26a1670\n")
+	if err := os.WriteFile(installPath, wantInstallID, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	installCalls := 0
+	reporterCalls := 0
+	analyticsCalls := 0
+	dependencies := defaultRunDependencies()
+	dependencies.loadInstallID = func(string) (string, error) {
+		installCalls++
+		return "", nil
+	}
+	dependencies.newReporter = func(string, string, string) errorReporter {
+		reporterCalls++
+		return &fakeErrorReporter{}
+	}
+	dependencies.newAnalytics = func(string, string, string, outputDebugger) lifecycleAnalytics {
+		analyticsCalls++
+		return &fakeAnalytics{}
+	}
+
+	var stdout bytes.Buffer
+	if code := run(context.Background(), []string{"warrden", "unknown"}, &stdout, dependencies); code != 1 {
+		t.Fatalf("exit=%d output:\n%s", code, stdout.String())
+	}
+	if installCalls != 0 || reporterCalls != 0 || analyticsCalls != 0 {
+		t.Fatalf("telemetry calls: install=%d reporter=%d analytics=%d", installCalls, reporterCalls, analyticsCalls)
+	}
+	gotInstallID, err := os.ReadFile(installPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotInstallID, wantInstallID) {
+		t.Fatalf("installation ID changed from %q to %q", wantInstallID, gotInstallID)
+	}
+}
+
 func TestRunRejectsInvalidIdentityBeforeDatabaseOpen(t *testing.T) {
 	directory := prepareRunTest(t)
 	t.Setenv("PUID", "0")
@@ -273,6 +315,7 @@ instances:
 	t.Setenv("PGID", gid)
 	t.Setenv("TZ", "UTC")
 	t.Setenv("GIT_TAG", "test")
+	t.Setenv("TELEMETRY", "")
 	return directory
 }
 
@@ -285,6 +328,8 @@ type readyWriter struct {
 
 type captureReporter struct{ count int }
 
+type fakeErrorReporter struct{}
+
 type fakeAnalytics struct {
 	mu      sync.Mutex
 	started bool
@@ -293,6 +338,12 @@ type fakeAnalytics struct {
 }
 
 func (r *captureReporter) Capture(error, string, string) { r.count++ }
+
+func (*fakeErrorReporter) Capture(error, string, string) {}
+
+func (*fakeErrorReporter) Flush(context.Context) bool { return true }
+
+func (*fakeErrorReporter) Recover() {}
 
 func (a *fakeAnalytics) Start(context.Context) {
 	a.mu.Lock()

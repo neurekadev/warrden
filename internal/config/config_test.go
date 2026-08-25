@@ -222,6 +222,36 @@ func TestOptionsFromEnv(t *testing.T) {
 	}
 }
 
+func TestOptionsTelemetryEnabledByDefault(t *testing.T) {
+	t.Setenv("TELEMETRY", "")
+	if err := os.Unsetenv("TELEMETRY"); err != nil {
+		t.Fatal(err)
+	}
+	if !OptionsFromEnv().TelemetryEnabled {
+		t.Fatal("telemetry is disabled when TELEMETRY is unset")
+	}
+}
+
+func TestOptionsTelemetryOptOut(t *testing.T) {
+	tests := []struct {
+		value   string
+		enabled bool
+	}{
+		{value: "true", enabled: true},
+		{value: "invalid", enabled: true},
+		{value: "false", enabled: false},
+		{value: " FaLsE ", enabled: false},
+	}
+	for _, test := range tests {
+		t.Run(test.value, func(t *testing.T) {
+			t.Setenv("TELEMETRY", test.value)
+			if got := OptionsFromEnv().TelemetryEnabled; got != test.enabled {
+				t.Fatalf("TELEMETRY=%q enabled=%t, want %t", test.value, got, test.enabled)
+			}
+		})
+	}
+}
+
 func TestOptionsUseBuildVersionWithoutRuntimeOverride(t *testing.T) {
 	t.Setenv("GIT_TAG", "4.2.1")
 	if got := OptionsFromEnv().AppVersion; got != "4.2.1" {

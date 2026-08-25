@@ -33,6 +33,9 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	if strings.Contains(composeText, "cap_drop:") || strings.Contains(composeText, "cap_add:") {
 		t.Error("compose.yaml must preserve Docker's default capability set for recursive ownership changes")
 	}
+	if strings.Contains(composeText, "TELEMETRY") {
+		t.Error("compose.yaml must not configure TELEMETRY")
+	}
 
 	dockerfile := string(readRepositoryFile(t, "../../Dockerfile"))
 	for _, want := range []string{
@@ -75,6 +78,9 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 			t.Errorf(".env.example must omit %s", key)
 		}
 	}
+	if strings.Contains(environment, "TELEMETRY") {
+		t.Error(".env.example must not document TELEMETRY")
+	}
 	lines := strings.Split(strings.TrimSpace(environment), "\n")
 	if len(lines) == 0 || lines[0] != "# --[ RUNTIME ]----------------------------------------------------------------" {
 		t.Error(".env.example must start with the RUNTIME capsule header")
@@ -100,6 +106,18 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		if strings.Contains(readme, forbidden) {
 			t.Errorf("README.md contains retired repository reference %q", forbidden)
 		}
+	}
+	if !strings.Contains(readme, "`TELEMETRY=false`") {
+		t.Error("README.md must document the telemetry opt-out")
+	}
+	lastSection := ""
+	for _, line := range strings.Split(strings.TrimSpace(readme), "\n") {
+		if strings.HasPrefix(line, "## ") {
+			lastSection = line
+		}
+	}
+	if lastSection != "## Telemetry" {
+		t.Errorf("README.md final section=%q, want %q", lastSection, "## Telemetry")
 	}
 
 	changelog := string(readRepositoryFile(t, "../../CHANGELOG.md"))
