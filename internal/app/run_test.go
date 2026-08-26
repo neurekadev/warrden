@@ -157,9 +157,10 @@ func TestRunMissingConfigUsesEstablishedError(t *testing.T) {
 
 func TestRunDisablesRejectedAPIKeyAndShutsDown(t *testing.T) {
 	directory := prepareRunTest(t)
+	t.Setenv("GIT_TAG", "1.2.3")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v3/system/status" || r.Header.Get("X-Api-Key") != "secret" {
-			t.Errorf("unexpected validation request: %s key=%q", r.URL.Path, r.Header.Get("X-Api-Key"))
+		if r.URL.Path != "/api/v3/system/status" || r.Header.Get("X-Api-Key") != "secret" || r.UserAgent() != "wArrden/1.2.3" {
+			t.Errorf("unexpected validation request: %s key=%q user-agent=%q", r.URL.Path, r.Header.Get("X-Api-Key"), r.UserAgent())
 		}
 		w.WriteHeader(http.StatusUnauthorized)
 	}))

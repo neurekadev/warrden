@@ -21,6 +21,7 @@ import (
 // ClientOptions configures one arr HTTP client.
 type ClientOptions struct {
 	Instance       config.Instance
+	AppVersion     string
 	RetryCount     int
 	AttemptTimeout time.Duration
 	BaseDelay      time.Duration
@@ -36,6 +37,7 @@ type Client struct {
 	timeout   time.Duration
 	baseDelay time.Duration
 	ownsHTTP  bool
+	userAgent string
 }
 
 // NewHTTPClient creates the shared production HTTP client used by arr instances.
@@ -70,7 +72,24 @@ func NewClient(options ClientOptions) *Client {
 		timeout = 30 * time.Second
 	}
 	retries := max(options.RetryCount, 0)
-	return &Client{instance: options.Instance, baseURL: &base, http: httpClient, retries: retries, timeout: timeout, baseDelay: baseDelay, ownsHTTP: ownsHTTP}
+	return &Client{
+		instance: options.Instance, baseURL: &base, http: httpClient, retries: retries,
+		timeout: timeout, baseDelay: baseDelay, ownsHTTP: ownsHTTP, userAgent: formatUserAgent(options.AppVersion),
+	}
+}
+
+func formatUserAgent(version string) string {
+	version = strings.TrimSpace(version)
+	if version == "" {
+		version = "dev"
+	}
+	version = strings.Map(func(character rune) rune {
+		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' || character >= '0' && character <= '9' || strings.ContainsRune("!#$%&'*+-.^_`|~", character) {
+			return character
+		}
+		return '-'
+	}, version)
+	return "wArrden/" + version
 }
 
 // Instance returns the configured display name.
@@ -402,6 +421,7 @@ func (c *Client) do(ctx context.Context, method, endpoint string, body []byte) (
 			return nil, fmt.Errorf("create request: %w", err)
 		}
 		request.Header.Set("X-Api-Key", c.instance.APIKey)
+		request.Header.Set("User-Agent", c.userAgent)
 		if body != nil {
 			request.Header.Set("Content-Type", "application/json; charset=utf-8")
 		}

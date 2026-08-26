@@ -195,7 +195,7 @@ func runDaemon(ctx context.Context, cfg *config.Config, opts config.Options, dat
 		if !instance.Enabled {
 			continue
 		}
-		clients[instance.Key()] = arr.NewClient(arr.ClientOptions{Instance: instance, RetryCount: opts.RetryCount, AttemptTimeout: opts.AttemptTimeout, HTTPClient: httpClient})
+		clients[instance.Key()] = arr.NewClient(arr.ClientOptions{Instance: instance, AppVersion: opts.AppVersion, RetryCount: opts.RetryCount, AttemptTimeout: opts.AttemptTimeout, HTTPClient: httpClient})
 	}
 	runtimeWarnings = append(runtimeWarnings, validateInstances(ctx, cfg, clients, tracker)...)
 

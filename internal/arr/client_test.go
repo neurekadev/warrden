@@ -101,6 +101,27 @@ func TestQueueContinuesAfterFullDuplicatePage(t *testing.T) {
 
 func stringPointer(value string) *string { return &value }
 
+func TestFormatUserAgent(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		version string
+		want    string
+	}{
+		{name: "release", version: "1.2.3", want: "wArrden/1.2.3"},
+		{name: "development fallback", want: "wArrden/dev"},
+		{name: "invalid token characters", version: " v1 beta/2 ", want: "wArrden/v1-beta-2"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if got := formatUserAgent(test.version); got != test.want {
+				t.Errorf("formatUserAgent(%q) = %q, want %q", test.version, got, test.want)
+			}
+		})
+	}
+}
+
 func TestClientUsesApplicationSpecificEndpoints(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -111,6 +132,19 @@ func TestClientUsesApplicationSpecificEndpoints(t *testing.T) {
 		wantCommand   map[string]any
 		call          func(context.Context, *Client) error
 	}{
+		{
+			name:          "radarr",
+			kind:          config.Radarr,
+			version:       "v3",
+			wantDeleteRaw: "blocklist=true&skipRedownload=false",
+			wantCommand:   map[string]any{"name": "MoviesSearch", "movieIds": []any{float64(4), float64(8)}},
+			call: func(ctx context.Context, client *Client) error {
+				if err := client.DeleteQueue(ctx, 9, true); err != nil {
+					return err
+				}
+				return client.SearchMovies(ctx, []int{4, 8})
+			},
+		},
 		{
 			name:          "sonarr",
 			kind:          config.Sonarr,
@@ -138,6 +172,19 @@ func TestClientUsesApplicationSpecificEndpoints(t *testing.T) {
 			},
 		},
 		{
+			name:          "whisparr",
+			kind:          config.Whisparr,
+			version:       "v3",
+			wantDeleteRaw: "blocklist=true&skipRedownload=false",
+			wantCommand:   map[string]any{"name": "SeasonSearch", "seriesId": float64(12), "seasonNumber": float64(3)},
+			call: func(ctx context.Context, client *Client) error {
+				if err := client.DeleteQueue(ctx, 9, true); err != nil {
+					return err
+				}
+				return client.SearchSeason(ctx, 12, 3)
+			},
+		},
+		{
 			name:          "whisparr eros",
 			kind:          config.Whisparr,
 			version:       "v3-eros",
@@ -157,6 +204,9 @@ func TestClientUsesApplicationSpecificEndpoints(t *testing.T) {
 			var command map[string]any
 			var deleteQuery string
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if got := r.UserAgent(); got != "wArrden/dev" {
+					t.Errorf("User-Agent = %q, want %q", got, "wArrden/dev")
+				}
 				switch r.Method {
 				case http.MethodDelete:
 					deleteQuery = r.URL.RawQuery
@@ -220,7 +270,10 @@ func TestClientRetriesTransientFailuresOnly(t *testing.T) {
 	t.Run("server error", func(t *testing.T) {
 		t.Parallel()
 		var attempts atomic.Int32
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if got := r.UserAgent(); got != "wArrden/dev" {
+				t.Errorf("retry User-Agent = %q, want %q", got, "wArrden/dev")
+			}
 			if attempts.Add(1) < 3 {
 				w.WriteHeader(http.StatusBadGateway)
 				return
