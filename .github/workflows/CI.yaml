@@ -1,0 +1,421 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["[0-9]*.[0-9]*.[0-9]*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      CGO_ENABLED: 0
+
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set Up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Check Formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(git ls-files '*.go')
+          unformatted="$(gofmt -l "${files[@]}")"
+          if [[ -n "$unformatted" ]]; then
+            echo "The following Go files are not formatted:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
+
+      - name: Run Golangci-Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13.2
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      CGO_ENABLED: 0
+
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set Up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Run Unit Tests
+        run: go test ./...
+
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CGO_ENABLED: 0
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Go
+            kind: go
+            runner: ubuntu-24.04
+          - name: Image AMD64
+            kind: container
+            component: warrden
+            context: .
+            dockerfile: Dockerfile
+            arch: amd64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+          - name: Image ARM64
+            kind: container
+            component: warrden
+            context: .
+            dockerfile: Dockerfile
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set Up Go
+        if: matrix.kind == 'go'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Build Go Packages
+        if: matrix.kind == 'go'
+        run: go build ./...
+
+      - name: Build Release Targets
+        if: matrix.kind == 'go'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for arch in amd64 arm64; do
+            GOOS=linux GOARCH="$arch" go build \
+              -trimpath \
+              -buildvcs=false \
+              -o "$RUNNER_TEMP/warrden-$arch" \
+              ./cmd/warrden
+          done
+
+      - name: Validate Compose Model
+        if: matrix.kind == 'go'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          docker compose config --quiet
+
+      - name: Set Up Docker Buildx
+        if: matrix.kind == 'container'
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build Image
+        if: matrix.kind == 'container'
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          push: false
+          provenance: false
+          sbom: false
+          build-args: |
+            GIT_TAG=ci
+            GIT_HASH=${{ github.sha }}
+          cache-from: type=gha,scope=ci-${{ matrix.component }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=ci-${{ matrix.component }}-${{ matrix.arch }},mode=max,ignore-error=true
+
+  publish-platforms:
+    name: Publish ${{ matrix.name }}
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref_type == 'tag')
+    needs:
+      - lint
+      - unit-tests
+      - build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Image AMD64
+            component: warrden
+            description: Automated media library maintenance with wArrden
+            context: .
+            dockerfile: Dockerfile
+            arch: amd64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+          - name: Image ARM64
+            component: warrden
+            description: Automated media library maintenance with wArrden
+            context: .
+            dockerfile: Dockerfile
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+      SOURCE_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'edge' }}
+
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log In to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Extract Image Metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=wArrden
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.version=${{ env.SOURCE_VERSION }}
+          annotations: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=wArrden
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.version=${{ env.SOURCE_VERSION }}
+
+      - name: Build and Publish Platform Image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          labels: ${{ steps.metadata.outputs.labels }}
+          annotations: ${{ steps.metadata.outputs.annotations }}
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            GIT_TAG=${{ env.SOURCE_VERSION }}
+            GIT_HASH=${{ github.sha }}
+          cache-from: type=gha,scope=publish-${{ matrix.component }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=publish-${{ matrix.component }}-${{ matrix.arch }},mode=max,ignore-error=true
+
+      - name: Export Digest
+        shell: bash
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Build produced an invalid digest: $DIGEST" >&2
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+
+      - name: Upload Digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ matrix.component }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish Image
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref_type == 'tag')
+    needs:
+      - publish-platforms
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+      SOURCE_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'edge' }}
+
+    steps:
+      - name: Download Digests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: digests-warrden-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+
+      - name: Log In to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Extract Image Metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=auto
+          tags: |
+            type=edge
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=wArrden
+            org.opencontainers.image.description=Automated media library maintenance with wArrden
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.version=${{ env.SOURCE_VERSION }}
+          annotations: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=wArrden
+            org.opencontainers.image.description=Automated media library maintenance with wArrden
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.version=${{ env.SOURCE_VERSION }}
+
+      - name: Create Multi-Platform Manifest
+        shell: bash
+        env:
+          DIGESTS: ${{ runner.temp }}/digests
+          TAGS: ${{ steps.metadata.outputs.tags }}
+        run: |
+          set -euo pipefail
+          mapfile -t digest_files < <(find "$DIGESTS" -maxdepth 1 -type f -printf '%f\n' | sort)
+          if [[ "${#digest_files[@]}" -ne 2 ]]; then
+            echo "Expected two platform digests, found ${#digest_files[@]}." >&2
+            exit 1
+          fi
+
+          sources=()
+          for digest in "${digest_files[@]}"; do
+            if [[ ! "$digest" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "Invalid digest filename: $digest" >&2
+              exit 1
+            fi
+            sources+=("$IMAGE@sha256:$digest")
+          done
+
+          tag_args=()
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              tag_args+=(--tag "$tag")
+            fi
+          done <<< "$TAGS"
+          if [[ "${#tag_args[@]}" -eq 0 ]]; then
+            echo "No image tags were generated for $SOURCE_VERSION." >&2
+            exit 1
+          fi
+
+          docker buildx imagetools create "${tag_args[@]}" "${sources[@]}"
+
+      - name: Verify Multi-Platform Manifest
+        shell: bash
+        env:
+          VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$VERSION" ]]; then
+            echo "Image metadata did not produce a version." >&2
+            exit 1
+          fi
+          manifest="$(docker buildx imagetools inspect --raw "$IMAGE:$VERSION")"
+          for platform in linux/amd64 linux/arm64; do
+            os="${platform%/*}"
+            architecture="${platform#*/}"
+            jq -e --arg os "$os" --arg architecture "$architecture" \
+              'any(.manifests[]?; .platform.os == $os and .platform.architecture == $architecture)' \
+              <<< "$manifest" >/dev/null
+          done
+
+  release:
+    name: Release
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs:
+      - lint
+      - unit-tests
+      - build
+      - publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check Out Repository History
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Create Release
+        uses: neurekadev/create-release-action@1
+        with:
+          github-token: ${{ github.token }}
+          api-key: ${{ secrets.INFERENCE_API_KEY }}

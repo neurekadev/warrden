@@ -94,7 +94,8 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	readme := string(readRepositoryFile(t, "../../README.md"))
 	for _, want := range []string{
 		"https://github.com/neurekadev/warrden",
-		"https://raw.githubusercontent.com/neurekadev/warrden/refs/heads/main/compose.yaml",
+		"actions/workflows/CI.yaml",
+		"Download [`compose.yaml`](./compose.yaml) and [`.env.example`](./.env.example).",
 		"> [!CAUTION]",
 		"Images at `registry.neureka.dev/warrden/warrden` are no longer updated. Use `ghcr.io/neurekadev/warrden`.",
 	} {
@@ -133,45 +134,56 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		t.Error("go.mod must use the GitHub repository module path")
 	}
 
-	workflow := readRepositoryFile(t, "../../.github/workflows/ci.yml")
+	workflow := readRepositoryFile(t, "../../.github/workflows/CI.yaml")
 	var workflowDocument yaml.Node
 	if err := yaml.Unmarshal(workflow, &workflowDocument); err != nil {
-		t.Fatalf(".github/workflows/ci.yml: %v", err)
+		t.Fatalf(".github/workflows/CI.yaml: %v", err)
 	}
 	workflowText := string(workflow)
 	for _, want := range []string{
+		"name: CI",
 		"pull_request:",
 		"workflow_dispatch:",
+		"permissions: {}",
+		"cancel-in-progress: ${{ github.ref_type != 'tag' }}",
+		"  lint:",
+		"  unit-tests:",
+		"  build:",
+		"  publish-platforms:",
+		"  publish:",
+		"  release:",
 		"actions/checkout@v7",
 		"actions/setup-go@v7",
-		"go mod tidy -diff",
 		"golangci/golangci-lint-action@v9",
-		"version: v2.13.1",
-		"govulncheck@v1.7.0",
-		"CGO_ENABLED=1 go test -race ./...",
+		"version: v2.13.2",
+		"CGO_ENABLED: 0",
+		"go test ./...",
+		"go build ./...",
 		"docker compose config --quiet",
-		"--platform linux/arm64",
-		"docker cp config.example.yaml warrden-container-test-config-writer:/app/data/config.yaml",
-		"/app/bin/clear-missing",
-		"America/Los_Angeles",
-		"ca-certificates.crt",
-		"docker stop --time 10",
-		"ghcr.io/neurekadev/warrden",
-		"docker/setup-qemu-action@v4",
+		"ubuntu-24.04-arm",
+		"platform: linux/amd64",
+		"platform: linux/arm64",
 		"docker/setup-buildx-action@v4",
 		"docker/login-action@v4",
 		"docker/metadata-action@v6",
 		"docker/build-push-action@v7",
-		"actions/attest@v4",
-		"type=raw,value=latest",
+		"actions/upload-artifact@v7",
+		"actions/download-artifact@v8",
+		"cache-from: type=gha,scope=ci-${{ matrix.component }}-${{ matrix.arch }}",
+		"cache-from: type=gha,scope=publish-${{ matrix.component }}-${{ matrix.arch }}",
+		"provenance: mode=max",
+		"sbom: true",
+		"push-by-digest=true",
+		"docker buildx imagetools create",
+		"type=edge",
+		"type=semver,pattern={{version}}",
 		"packages: write",
-		"attestations: write",
-		"push-to-registry: false",
 		"contents: write",
-		"gh release create",
+		"neurekadev/create-release-action@1",
+		"secrets.INFERENCE_API_KEY",
 	} {
 		if !strings.Contains(workflowText, want) {
-			t.Errorf(".github/workflows/ci.yml missing %q", want)
+			t.Errorf(".github/workflows/CI.yaml missing %q", want)
 		}
 	}
 	for _, forbidden := range []string{
@@ -182,18 +194,24 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		"$CI_",
 		"code.neureka.dev",
 		"registry.neureka.dev",
-		"push-to-registry: true",
+		"go mod tidy -diff",
+		"govulncheck",
+		"go test -race",
+		"docker/setup-qemu-action",
+		"docker run",
+		"actions/attest",
+		"id-token: write",
+		"attestations: write",
+		"gh release create",
+		"push-to-registry:",
 		"artifact-metadata: write",
 	} {
 		if strings.Contains(workflowText, forbidden) {
-			t.Errorf(".github/workflows/ci.yml contains forbidden value %q", forbidden)
+			t.Errorf(".github/workflows/CI.yaml contains forbidden value %q", forbidden)
 		}
 	}
-	if strings.Contains(workflowText, "$CI_PROJECT_DIR") {
-		t.Error("container smoke tests must not bind runner-local paths through the host Docker daemon")
-	}
-	if got := strings.Count(workflowText, "push-to-registry: false"); got != 2 {
-		t.Errorf("expected registry attestation publishing to be disabled for edge and release images, got %d", got)
+	if _, err := os.Stat("../../.github/workflows/ci.yml"); !os.IsNotExist(err) {
+		t.Errorf("legacy .github/workflows/ci.yml must be removed, stat error: %v", err)
 	}
 
 	dependabot := readRepositoryFile(t, "../../.github/dependabot.yml")
