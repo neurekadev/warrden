@@ -240,7 +240,6 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		"timeout-minutes: 20",
 		"contents: write",
 		"actions/checkout@v7",
-		"ref: ${{ inputs.release-tag }}",
 		"fetch-depth: 0",
 		"persist-credentials: false",
 		"neurekadev/create-release-action@1",
@@ -252,7 +251,13 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 			t.Errorf(".github/workflows/RegenerateReleaseNotes.yaml missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"needs:", "files:", "pull_request:", "push:"} {
+	for _, forbidden := range []string{
+		"needs:",
+		"files:",
+		"pull_request:",
+		"push:",
+		"ref: ${{ inputs.release-tag }}",
+	} {
 		if strings.Contains(releaseNotesWorkflowText, forbidden) {
 			t.Errorf(".github/workflows/RegenerateReleaseNotes.yaml contains forbidden value %q", forbidden)
 		}
