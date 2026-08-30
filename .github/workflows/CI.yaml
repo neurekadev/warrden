@@ -7,6 +7,20 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release-tag:
+        description: Existing bare Semantic Version release tag.
+        required: true
+        type: string
+      release-notes-audience:
+        description: Audience for the regenerated notes.
+        required: false
+        default: end-user
+        type: choice
+        options:
+          - end-user
+          - technical
+          - maintainer
 
 permissions: {}
 
@@ -170,8 +184,10 @@ jobs:
   publish-platforms:
     name: Publish ${{ matrix.name }}
     if: >-
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/main' || github.ref_type == 'tag')
+      (github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref_type == 'tag')) ||
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository)
     needs:
       - lint
       - unit-tests
@@ -202,8 +218,9 @@ jobs:
             runner: ubuntu-24.04-arm
             platform: linux/arm64
     env:
+      CACHE_PREFIX: ${{ github.event_name == 'pull_request' && 'ci' || 'publish' }}
       IMAGE: ghcr.io/${{ github.repository }}
-      SOURCE_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'edge' }}
+      SOURCE_VERSION: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.ref_type == 'tag' && github.ref_name || 'edge') }}
 
     steps:
       - name: Check Out Repository
@@ -256,8 +273,8 @@ jobs:
           build-args: |
             GIT_TAG=${{ env.SOURCE_VERSION }}
             GIT_HASH=${{ github.sha }}
-          cache-from: type=gha,scope=publish-${{ matrix.component }}-${{ matrix.arch }}
-          cache-to: type=gha,scope=publish-${{ matrix.component }}-${{ matrix.arch }},mode=max,ignore-error=true
+          cache-from: type=gha,scope=${{ env.CACHE_PREFIX }}-${{ matrix.component }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ env.CACHE_PREFIX }}-${{ matrix.component }}-${{ matrix.arch }},mode=max,ignore-error=true
 
       - name: Export Digest
         shell: bash
@@ -283,8 +300,10 @@ jobs:
   publish:
     name: Publish Image
     if: >-
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/main' || github.ref_type == 'tag')
+      (github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref_type == 'tag')) ||
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository)
     needs:
       - publish-platforms
     runs-on: ubuntu-24.04
@@ -294,7 +313,7 @@ jobs:
       packages: write
     env:
       IMAGE: ghcr.io/${{ github.repository }}
-      SOURCE_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'edge' }}
+      SOURCE_VERSION: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.ref_type == 'tag' && github.ref_name || 'edge') }}
 
     steps:
       - name: Download Digests
@@ -323,6 +342,7 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: latest=auto
           tags: |
+            type=ref,event=pr
             type=edge
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -419,3 +439,27 @@ jobs:
         with:
           github-token: ${{ github.token }}
           api-key: ${{ secrets.INFERENCE_API_KEY }}
+
+  regenerate-release-notes:
+    name: Regenerate Release Notes
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check Out Repository History
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release-tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Regenerate Release Notes
+        uses: neurekadev/create-release-action@1
+        with:
+          github-token: ${{ github.token }}
+          api-key: ${{ secrets.INFERENCE_API_KEY }}
+          release-tag: ${{ inputs.release-tag }}
+          release-notes-audience: ${{ inputs.release-notes-audience }}

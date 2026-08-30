@@ -84,7 +84,7 @@ func (r *Runner) episodes(ctx context.Context, client *arr.Client, category stri
 		return err
 	}
 	eligible := filter(wanted, func(item arr.Episode) int { return item.ID }, ids)
-	r.choose(eligible, job.MaxResults)
+	choose(eligible, job.MaxResults, r.intN)
 	selected := take(eligible, job.MaxResults)
 	slices.SortStableFunc(selected, compareEpisodes)
 	onCooldown := len(wanted) - len(eligible)
@@ -166,7 +166,7 @@ func (r *Runner) seasons(ctx context.Context, client *arr.Client, category strin
 		return err
 	}
 	eligible := filter(groups, func(item seasonGroup) int { return item.key }, ids)
-	r.choose(eligible, job.MaxResults)
+	choose(eligible, job.MaxResults, r.intN)
 	selected := take(eligible, job.MaxResults)
 	slices.SortStableFunc(selected, func(a, b seasonGroup) int {
 		if result := strings.Compare(seriesTitle(a.series), seriesTitle(b.series)); result != 0 {
@@ -234,7 +234,7 @@ func (r *Runner) movies(ctx context.Context, client *arr.Client, category string
 		return err
 	}
 	eligible := filter(wanted, func(item arr.Movie) int { return item.ID }, ids)
-	r.choose(eligible, job.MaxResults)
+	choose(eligible, job.MaxResults, r.intN)
 	selected := take(eligible, job.MaxResults)
 	slices.SortStableFunc(selected, func(a, b arr.Movie) int { return strings.Compare(nullable(a.Title, ""), nullable(b.Title, "")) })
 	onCooldown := len(wanted) - len(eligible)
@@ -297,7 +297,7 @@ func (r *Runner) albums(ctx context.Context, client *arr.Client, category string
 		return err
 	}
 	eligible := filter(wanted, func(item arr.Album) int { return item.ID }, ids)
-	r.choose(eligible, job.MaxResults)
+	choose(eligible, job.MaxResults, r.intN)
 	selected := take(eligible, job.MaxResults)
 	slices.SortStableFunc(selected, compareAlbums)
 	onCooldown := len(wanted) - len(eligible)
@@ -381,7 +381,7 @@ func (r *Runner) artists(ctx context.Context, client *arr.Client, category strin
 		return err
 	}
 	eligible := filter(groups, func(item artistGroup) int { return item.id }, ids)
-	r.choose(eligible, job.MaxResults)
+	choose(eligible, job.MaxResults, r.intN)
 	selected := take(eligible, job.MaxResults)
 	slices.SortStableFunc(selected, func(a, b artistGroup) int { return strings.Compare(artistName(a), artistName(b)) })
 	onCooldown := len(groups) - len(eligible)
@@ -489,10 +489,10 @@ func (r *Runner) applyTag(ctx context.Context, client *arr.Client, tagging *conf
 	action(tagID)
 }
 
-func (r *Runner) choose[T any](items []T, count int) {
+func choose[T any](items []T, count int, intN func(int) int) {
 	limit := min(count, len(items))
 	for index := 0; index < limit; index++ {
-		other := index + r.intN(len(items)-index)
+		other := index + intN(len(items)-index)
 		items[index], items[other] = items[other], items[index]
 	}
 }
