@@ -183,9 +183,6 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		"type=semver,pattern={{version}}",
 		"packages: write",
 		"contents: write",
-		"release-tag:",
-		"release-notes-audience:",
-		"  regenerate-release-notes:",
 		"neurekadev/create-release-action@1",
 		"secrets.INFERENCE_API_KEY",
 	} {
@@ -207,6 +204,9 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		"docker/setup-qemu-action",
 		"docker run",
 		"pull_request_target:",
+		"release-tag:",
+		"release-notes-audience:",
+		"  regenerate-release-notes:",
 		"actions/attest",
 		"id-token: write",
 		"attestations: write",
@@ -220,6 +220,42 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	}
 	if _, err := os.Stat("../../.github/workflows/ci.yml"); !os.IsNotExist(err) {
 		t.Errorf("legacy .github/workflows/ci.yml must be removed, stat error: %v", err)
+	}
+
+	releaseNotesWorkflow := readRepositoryFile(t, "../../.github/workflows/RegenerateReleaseNotes.yaml")
+	var releaseNotesWorkflowDocument yaml.Node
+	if err := yaml.Unmarshal(releaseNotesWorkflow, &releaseNotesWorkflowDocument); err != nil {
+		t.Fatalf(".github/workflows/RegenerateReleaseNotes.yaml: %v", err)
+	}
+	releaseNotesWorkflowText := string(releaseNotesWorkflow)
+	for _, want := range []string{
+		"name: Regenerate Release Notes",
+		"workflow_dispatch:",
+		"release-tag:",
+		"release-notes-audience:",
+		"permissions: {}",
+		"  regenerate-release-notes:",
+		"if: github.event_name == 'workflow_dispatch'",
+		"runs-on: ubuntu-latest",
+		"timeout-minutes: 20",
+		"contents: write",
+		"actions/checkout@v7",
+		"ref: ${{ inputs.release-tag }}",
+		"fetch-depth: 0",
+		"persist-credentials: false",
+		"neurekadev/create-release-action@1",
+		"secrets.INFERENCE_API_KEY",
+		"release-tag: ${{ inputs.release-tag }}",
+		"release-notes-audience: ${{ inputs.release-notes-audience }}",
+	} {
+		if !strings.Contains(releaseNotesWorkflowText, want) {
+			t.Errorf(".github/workflows/RegenerateReleaseNotes.yaml missing %q", want)
+		}
+	}
+	for _, forbidden := range []string{"needs:", "files:", "pull_request:", "push:"} {
+		if strings.Contains(releaseNotesWorkflowText, forbidden) {
+			t.Errorf(".github/workflows/RegenerateReleaseNotes.yaml contains forbidden value %q", forbidden)
+		}
 	}
 
 	dependabot := readRepositoryFile(t, "../../.github/dependabot.yml")

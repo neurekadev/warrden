@@ -7,20 +7,6 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      release-tag:
-        description: Existing bare Semantic Version release tag.
-        required: true
-        type: string
-      release-notes-audience:
-        description: Audience for the regenerated notes.
-        required: false
-        default: end-user
-        type: choice
-        options:
-          - end-user
-          - technical
-          - maintainer
 
 permissions: {}
 
@@ -439,27 +425,3 @@ jobs:
         with:
           github-token: ${{ github.token }}
           api-key: ${{ secrets.INFERENCE_API_KEY }}
-
-  regenerate-release-notes:
-    name: Regenerate Release Notes
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: write
-
-    steps:
-      - name: Check Out Repository History
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.release-tag }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Regenerate Release Notes
-        uses: neurekadev/create-release-action@1
-        with:
-          github-token: ${{ github.token }}
-          api-key: ${{ secrets.INFERENCE_API_KEY }}
-          release-tag: ${{ inputs.release-tag }}
-          release-notes-audience: ${{ inputs.release-notes-audience }}
