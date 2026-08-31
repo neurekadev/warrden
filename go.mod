@@ -3,7 +3,7 @@ module github.com/neurekadev/warrden
 go 1.27
 
 require (
-	github.com/getsentry/sentry-go v0.48.0
+	github.com/getsentry/sentry-go v0.49.0
 	github.com/go-co-op/gocron/v2 v2.22.0
 	github.com/uptrace/bun v1.2.18
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.18
