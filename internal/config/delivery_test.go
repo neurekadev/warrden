@@ -108,8 +108,8 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 			t.Errorf("README.md contains retired repository reference %q", forbidden)
 		}
 	}
-	if !strings.Contains(readme, "`TELEMETRY=false`") {
-		t.Error("README.md must document the telemetry opt-out")
+	if strings.Contains(strings.ToLower(readme), "telemetry") {
+		t.Error("README.md must not document telemetry")
 	}
 	lastSection := ""
 	for _, line := range strings.Split(strings.TrimSpace(readme), "\n") {
@@ -117,8 +117,8 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 			lastSection = line
 		}
 	}
-	if lastSection != "## Telemetry" {
-		t.Errorf("README.md final section=%q, want %q", lastSection, "## Telemetry")
+	if lastSection != "## Why Use wArrden?" {
+		t.Errorf("README.md final section=%q, want %q", lastSection, "## Why Use wArrden?")
 	}
 
 	changelog := string(readRepositoryFile(t, "../../CHANGELOG.md"))

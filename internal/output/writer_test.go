@@ -43,7 +43,7 @@ func TestWriterExactLogContract(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			var buffer bytes.Buffer
-			writer := New(&buffer, Debug, time.UTC, nil)
+			writer := New(&buffer, Debug, time.UTC)
 			writer.now = fixedClock
 			test.write(writer)
 			if got := buffer.String(); got != test.want {
@@ -56,7 +56,7 @@ func TestWriterExactLogContract(t *testing.T) {
 func TestWriterRespectsLevel(t *testing.T) {
 	t.Parallel()
 	var buffer bytes.Buffer
-	writer := New(&buffer, Warning, time.UTC, nil)
+	writer := New(&buffer, Warning, time.UTC)
 	writer.Debug("ctx", "debug")
 	writer.Search("Instance", "Missing Search", 1).Header()
 	writer.Warn("ctx", "warning")
@@ -71,7 +71,7 @@ func TestWriterRespectsLevel(t *testing.T) {
 func TestSearchExactStatsBeforeResults(t *testing.T) {
 	t.Parallel()
 	var buffer bytes.Buffer
-	writer := New(&buffer, Info, time.UTC, nil)
+	writer := New(&buffer, Info, time.UTC)
 	writer.now = fixedClock
 	search := writer.Search("Sonarr", "Missing Search", 3)
 	search.Header()
@@ -106,7 +106,7 @@ func TestSearchExactStatsBeforeResults(t *testing.T) {
 func TestSearchNoItemsUsesCompleteStats(t *testing.T) {
 	t.Parallel()
 	var buffer bytes.Buffer
-	writer := New(&buffer, Info, time.UTC, nil)
+	writer := New(&buffer, Info, time.UTC)
 	writer.now = fixedClock
 	search := writer.Search("Radarr", "Upgrade Search", 2)
 	search.Header()
@@ -126,7 +126,7 @@ func TestSearchNoItemsUsesCompleteStats(t *testing.T) {
 func TestQueueOutputExactMixedActions(t *testing.T) {
 	t.Parallel()
 	var buffer bytes.Buffer
-	writer := New(&buffer, Info, time.UTC, nil)
+	writer := New(&buffer, Info, time.UTC)
 	writer.now = fixedClock
 	writer.QueueResult("Sonarr", 100, 10, 2, []QueueItem{
 		{Title: "First", Rule: "SAMPLE"},
@@ -149,7 +149,7 @@ func TestQueueOutputExactMixedActions(t *testing.T) {
 func TestQueueOutputReportsUndisplayedMatches(t *testing.T) {
 	t.Parallel()
 	var buffer bytes.Buffer
-	writer := New(&buffer, Info, time.UTC, nil)
+	writer := New(&buffer, Info, time.UTC)
 	writer.now = fixedClock
 	writer.QueueResult("Sonarr", 10, 4, 3, []QueueItem{{Title: "First", Rule: "SAMPLE"}}, false)
 	if !strings.Contains(buffer.String(), "    +2 more\n") {

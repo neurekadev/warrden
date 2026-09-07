@@ -84,7 +84,7 @@ func TestEpisodeSearchPreservesSelectionAndOutputSemantics(t *testing.T) {
 	instance, client := searchClient(t, server.URL, config.Sonarr)
 	store := &fakeCooldown{blocked: map[int]struct{}{2: {}}}
 	var buffer bytes.Buffer
-	runner := New(store, output.New(&buffer, output.Info, time.UTC, nil), nil)
+	runner := New(store, output.New(&buffer, output.Info, time.UTC), nil)
 	runner.intN = func(int) int { return 0 }
 	job := &config.Job{MaxResults: 2, Cooldown: time.Hour, SearchType: config.Episode}
 	if err := runner.Run(context.Background(), client, instance, job, true, false); err != nil {
@@ -125,7 +125,7 @@ func TestDryRunSkipsIndexerSearchAndCooldownWrite(t *testing.T) {
 	instance, client := searchClient(t, server.URL, config.Radarr)
 	store := &fakeCooldown{blocked: map[int]struct{}{}}
 	var buffer bytes.Buffer
-	runner := New(store, output.New(&buffer, output.Info, time.UTC, nil), nil)
+	runner := New(store, output.New(&buffer, output.Info, time.UTC), nil)
 	runner.intN = func(int) int { return 0 }
 	job := &config.Job{MaxResults: 1, Cooldown: time.Hour}
 	if err := runner.Run(context.Background(), client, instance, job, true, true); err != nil {
@@ -167,7 +167,7 @@ func TestSeasonSearchRecordsOnlySuccessfulGroups(t *testing.T) {
 	instance, client := searchClient(t, server.URL, config.Sonarr)
 	store := &fakeCooldown{blocked: map[int]struct{}{}}
 	var buffer bytes.Buffer
-	runner := New(store, output.New(&buffer, output.Info, time.UTC, nil), nil)
+	runner := New(store, output.New(&buffer, output.Info, time.UTC), nil)
 	runner.intN = func(int) int { return 0 }
 	job := &config.Job{MaxResults: 2, Cooldown: time.Hour, SearchType: config.Season}
 	if err := runner.Run(context.Background(), client, instance, job, true, false); err != nil {
@@ -240,7 +240,7 @@ func TestMovieUpgradeUsesCutoffEndpoint(t *testing.T) {
 	t.Cleanup(server.Close)
 	instance, client := searchClient(t, server.URL, config.Radarr)
 	store := &fakeCooldown{blocked: map[int]struct{}{}}
-	runner := New(store, output.New(&bytes.Buffer{}, output.Info, time.UTC, nil), nil)
+	runner := New(store, output.New(&bytes.Buffer{}, output.Info, time.UTC), nil)
 	runner.intN = func(int) int { return 0 }
 	if err := runner.Run(context.Background(), client, instance, &config.Job{MaxResults: 1, Cooldown: time.Hour}, false, false); err != nil {
 		t.Fatal(err)
@@ -286,7 +286,7 @@ func TestLidarrAlbumAndArtistSearchModes(t *testing.T) {
 			instance, client := searchClient(t, server.URL, config.Lidarr)
 			instance.APIVersion = "v1"
 			store := &fakeCooldown{blocked: map[int]struct{}{}}
-			runner := New(store, output.New(&bytes.Buffer{}, output.Info, time.UTC, nil), nil)
+			runner := New(store, output.New(&bytes.Buffer{}, output.Info, time.UTC), nil)
 			runner.intN = func(int) int { return 0 }
 			job := &config.Job{MaxResults: 1, Cooldown: time.Hour, SearchType: test.searchType}
 			if err := runner.Run(context.Background(), client, instance, job, true, false); err != nil {

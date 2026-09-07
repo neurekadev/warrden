@@ -58,19 +58,6 @@ func TestRunClearAliasCreatesGoDatabase(t *testing.T) {
 	}
 }
 
-func TestDeploymentEnvironment(t *testing.T) {
-	t.Parallel()
-	tests := map[string]string{
-		"": "development", "dev": "development", "DEV": "development",
-		"edge-abc123": "edge", "4.7.0": "production",
-	}
-	for release, want := range tests {
-		if got := deploymentEnvironment(release); got != want {
-			t.Errorf("deploymentEnvironment(%q)=%q, want %q", release, got, want)
-		}
-	}
-}
-
 func TestRunReportsUnknownCommandOnStdout(t *testing.T) {
 	prepareRunTest(t)
 	var stdout bytes.Buffer
@@ -81,48 +68,6 @@ func TestRunReportsUnknownCommandOnStdout(t *testing.T) {
 	text := stdout.String()
 	if !strings.Contains(text, "Unknown command: unknown") || !strings.Contains(text, "Available commands: clear-missing [instance], clear-upgrades [instance]") {
 		t.Fatalf("unexpected output:\n%s", text)
-	}
-}
-
-func TestRunTelemetryOptOutSkipsInstallationAndReporters(t *testing.T) {
-	directory := prepareRunTest(t)
-	t.Setenv("TELEMETRY", " FaLsE ")
-	installPath := filepath.Join(directory, "data", "install-id")
-	wantInstallID := []byte("f08e267c-9070-4f3a-a485-5fcfa26a1670\n")
-	if err := os.WriteFile(installPath, wantInstallID, 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	installCalls := 0
-	reporterCalls := 0
-	analyticsCalls := 0
-	dependencies := defaultRunDependencies()
-	dependencies.loadInstallID = func(string) (string, error) {
-		installCalls++
-		return "", nil
-	}
-	dependencies.newReporter = func(string, string, string) errorReporter {
-		reporterCalls++
-		return &fakeErrorReporter{}
-	}
-	dependencies.newAnalytics = func(string, string, string, outputDebugger) lifecycleAnalytics {
-		analyticsCalls++
-		return &fakeAnalytics{}
-	}
-
-	var stdout bytes.Buffer
-	if code := run(context.Background(), []string{"warrden", "unknown"}, &stdout, dependencies); code != 1 {
-		t.Fatalf("exit=%d output:\n%s", code, stdout.String())
-	}
-	if installCalls != 0 || reporterCalls != 0 || analyticsCalls != 0 {
-		t.Fatalf("telemetry calls: install=%d reporter=%d analytics=%d", installCalls, reporterCalls, analyticsCalls)
-	}
-	gotInstallID, err := os.ReadFile(installPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(gotInstallID, wantInstallID) {
-		t.Fatalf("installation ID changed from %q to %q", wantInstallID, gotInstallID)
 	}
 }
 
@@ -175,12 +120,7 @@ func TestRunDisablesRejectedAPIKeyAndShutsDown(t *testing.T) {
 	defer cancel()
 	stdout := newReadyWriter()
 	done := make(chan int, 1)
-	dependencies := defaultRunDependencies()
-	analytics := &fakeAnalytics{}
-	dependencies.newAnalytics = func(string, string, string, outputDebugger) lifecycleAnalytics {
-		return analytics
-	}
-	go func() { done <- run(ctx, []string{"warrden"}, stdout, dependencies) }()
+	go func() { done <- Run(ctx, []string{"warrden"}, stdout) }()
 	select {
 	case <-stdout.ready:
 		cancel()
@@ -198,11 +138,6 @@ func TestRunDisablesRejectedAPIKeyAndShutsDown(t *testing.T) {
 	text := stdout.String()
 	if !strings.Contains(text, "DISABLED — API key rejected (401 Unauthorized)") || !strings.Contains(text, "Fix the API key and restart wArrden") {
 		t.Fatalf("missing disabled health state:\n%s", text)
-	}
-	analytics.mu.Lock()
-	defer analytics.mu.Unlock()
-	if !analytics.started || !analytics.stopped || analytics.reason != "shutdown" {
-		t.Fatalf("analytics lifecycle started=%t stopped=%t reason=%q", analytics.started, analytics.stopped, analytics.reason)
 	}
 }
 
@@ -272,22 +207,24 @@ func TestValidationWarningsAreStableAndDoNotMutateConfig(t *testing.T) {
 	}
 }
 
-func TestFailureReportingFiltersExpectedArrFailures(t *testing.T) {
+func TestFailureReportingRoutesExpectedArrFailures(t *testing.T) {
 	t.Parallel()
-	reporter := &captureReporter{}
 	var stdout bytes.Buffer
-	out := output.New(&stdout, output.Debug, time.UTC, reporter)
+	out := output.New(&stdout, output.Debug, time.UTC)
 	instance := config.Instance{Kind: config.Sonarr, Name: "Series"}
 	tracker := health.New()
 
 	reportFailure(out, tracker, instance, "series.missing", "Missing search job failed", &arr.HTTPError{StatusCode: 500, Status: "Internal Server Error"})
+	if !strings.Contains(stdout.String(), "WARN] [series.missing]") || !strings.Contains(stdout.String(), "Missing search job failed") {
+		t.Fatalf("expected gateway failure logged as warning:\n%s", stdout.String())
+	}
 	reportFailure(out, tracker, instance, "series.missing", "Missing search job failed", &arr.HTTPError{StatusCode: 401, Status: "Unauthorized"})
-	if reporter.count != 0 {
-		t.Fatalf("expected arr failures reached telemetry: %d", reporter.count)
+	if !strings.Contains(stdout.String(), "Instance Series disabled — API key rejected (401 Unauthorized)") {
+		t.Fatalf("expected auth failure to disable the instance:\n%s", stdout.String())
 	}
 	reportFailure(out, tracker, instance, "series.missing", "Missing search job failed", errors.New("defect"))
-	if reporter.count != 1 {
-		t.Fatalf("unexpected defect captures = %d, want 1", reporter.count)
+	if !strings.Contains(stdout.String(), "ERROR] [series.missing]") {
+		t.Fatalf("expected unexpected defect logged as error:\n%s", stdout.String())
 	}
 }
 
@@ -316,7 +253,6 @@ instances:
 	t.Setenv("PGID", gid)
 	t.Setenv("TZ", "UTC")
 	t.Setenv("GIT_TAG", "test")
-	t.Setenv("TELEMETRY", "")
 	return directory
 }
 
@@ -325,38 +261,6 @@ type readyWriter struct {
 	data  bytes.Buffer
 	ready chan struct{}
 	once  sync.Once
-}
-
-type captureReporter struct{ count int }
-
-type fakeErrorReporter struct{}
-
-type fakeAnalytics struct {
-	mu      sync.Mutex
-	started bool
-	stopped bool
-	reason  string
-}
-
-func (r *captureReporter) Capture(error, string, string) { r.count++ }
-
-func (*fakeErrorReporter) Capture(error, string, string) {}
-
-func (*fakeErrorReporter) Flush(context.Context) bool { return true }
-
-func (*fakeErrorReporter) Recover() {}
-
-func (a *fakeAnalytics) Start(context.Context) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.started = true
-}
-
-func (a *fakeAnalytics) Stop(_ context.Context, reason string) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.stopped = true
-	a.reason = reason
 }
 
 func newReadyWriter() *readyWriter { return &readyWriter{ready: make(chan struct{})} }

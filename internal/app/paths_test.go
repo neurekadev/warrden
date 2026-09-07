@@ -14,7 +14,6 @@ func TestFixedRuntimePaths(t *testing.T) {
 		filepath.ToSlash(configPath):         "data/config.yaml",
 		filepath.ToSlash(databasePath):       "data/warrden.db",
 		filepath.ToSlash(legacyDatabasePath): "data/warden.db",
-		filepath.ToSlash(installIDPath):      "data/install-id",
 	}
 	for got, want := range checks {
 		if got != want {

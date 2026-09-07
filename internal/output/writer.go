@@ -21,10 +21,6 @@ const (
 	Error                // Error emits error output only.
 )
 
-type reporter interface {
-	Capture(error, string, string)
-}
-
 type clock func() time.Time
 
 // Writer serializes all log output onto one stream.
@@ -34,18 +30,17 @@ type Writer struct {
 	level    Level
 	location *time.Location
 	now      clock
-	reporter reporter
 }
 
 // New constructs an output writer.
-func New(out io.Writer, level Level, location *time.Location, r reporter) *Writer {
+func New(out io.Writer, level Level, location *time.Location) *Writer {
 	if out == nil {
 		out = io.Discard
 	}
 	if location == nil {
 		location = time.UTC
 	}
-	return &Writer{out: out, level: level, location: location, now: time.Now, reporter: r}
+	return &Writer{out: out, level: level, location: location, now: time.Now}
 }
 
 // ParseLevel converts the public configuration spelling to a Level.
@@ -78,7 +73,7 @@ func (w *Writer) Warn(context, message string, detail ...string) {
 	w.log("WARN", context, message, first(detail))
 }
 
-// ErrorText writes an error that must not be sent to telemetry.
+// ErrorText writes an error message with free-form detail.
 func (w *Writer) ErrorText(context, message string, detail ...string) {
 	if w.level > Error {
 		return
@@ -86,11 +81,8 @@ func (w *Writer) ErrorText(context, message string, detail ...string) {
 	w.log("ERROR", context, message, first(detail))
 }
 
-// Error writes and reports an unexpected application error.
+// Error writes an unexpected application error.
 func (w *Writer) Error(context, message string, err error) {
-	if w.reporter != nil && err != nil {
-		w.reporter.Capture(err, context, message)
-	}
 	if w.level > Error {
 		return
 	}

@@ -57,7 +57,7 @@ func (f fakeIDs) IDs(context.Context, string, string) (map[int]struct{}, error) 
 
 func TestFindOrCreateIsCaseInsensitive(t *testing.T) {
 	t.Parallel()
-	tagger := New(output.New(&bytes.Buffer{}, output.Debug, time.UTC, nil), fakeIDs{})
+	tagger := New(output.New(&bytes.Buffer{}, output.Debug, time.UTC), fakeIDs{})
 	client := &fakeClient{tags: []arr.Tag{{ID: 4, Label: "wArrden"}}}
 	id, err := tagger.FindOrCreate(context.Background(), client, "WARrDEN")
 	if err != nil {
@@ -79,7 +79,7 @@ func TestFindOrCreateIsCaseInsensitive(t *testing.T) {
 
 func TestDirectTaggingPreservesFirstOccurrenceOrder(t *testing.T) {
 	t.Parallel()
-	tagger := New(output.New(&bytes.Buffer{}, output.Debug, time.UTC, nil), fakeIDs{})
+	tagger := New(output.New(&bytes.Buffer{}, output.Debug, time.UTC), fakeIDs{})
 	client := &fakeClient{}
 	if got := tagger.Series(context.Background(), client, []int{3, 1, 3, 2}, 7); got != 3 {
 		t.Fatalf("tagged=%d", got)
@@ -91,7 +91,7 @@ func TestDirectTaggingPreservesFirstOccurrenceOrder(t *testing.T) {
 
 func TestRetroactiveTaggingSortsResolvedResources(t *testing.T) {
 	t.Parallel()
-	tagger := New(output.New(&bytes.Buffer{}, output.Debug, time.UTC, nil), fakeIDs{values: map[int]struct{}{10: {}, 20: {}}})
+	tagger := New(output.New(&bytes.Buffer{}, output.Debug, time.UTC), fakeIDs{values: map[int]struct{}{10: {}, 20: {}}})
 	client := &fakeClient{tags: []arr.Tag{{ID: 7, Label: "searched"}}, resolved: map[int]struct{}{5: {}, 2: {}, 9: {}}}
 	if err := tagger.RetroEpisodes(context.Background(), client, "Test", "Missing", "searched"); err != nil {
 		t.Fatal(err)
@@ -104,7 +104,7 @@ func TestRetroactiveTaggingSortsResolvedResources(t *testing.T) {
 func TestRetroactiveResolutionFailureStopsTagging(t *testing.T) {
 	t.Parallel()
 	want := errors.New("resolve failed")
-	tagger := New(output.New(&bytes.Buffer{}, output.Debug, time.UTC, nil), fakeIDs{values: map[int]struct{}{10: {}}})
+	tagger := New(output.New(&bytes.Buffer{}, output.Debug, time.UTC), fakeIDs{values: map[int]struct{}{10: {}}})
 	client := &fakeClient{resolveErr: want}
 	err := tagger.RetroAlbums(context.Background(), client, "Test", "Missing", "searched")
 	if !errors.Is(err, want) || len(client.artists) != 0 {
