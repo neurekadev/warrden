@@ -14,12 +14,11 @@ const (
 
 // Options contains process-level environment configuration.
 type Options struct {
-	DryRun           bool
-	TelemetryEnabled bool
-	Timezone         string
-	AppVersion       string
-	RetryCount       int
-	AttemptTimeout   time.Duration
+	DryRun         bool
+	Timezone       string
+	AppVersion     string
+	RetryCount     int
+	AttemptTimeout time.Duration
 }
 
 // OptionsFromEnv reads the established wArrden environment contract.
@@ -38,9 +37,8 @@ func OptionsFromEnv() Options {
 	}
 
 	return Options{
-		DryRun:           strings.EqualFold(os.Getenv("DRY_RUN"), "true"),
-		TelemetryEnabled: !strings.EqualFold(strings.TrimSpace(os.Getenv("TELEMETRY")), "false"),
-		Timezone:         os.Getenv("TZ"), AppVersion: appVersion, RetryCount: retryCount,
+		DryRun:   strings.EqualFold(os.Getenv("DRY_RUN"), "true"),
+		Timezone: os.Getenv("TZ"), AppVersion: appVersion, RetryCount: retryCount,
 		AttemptTimeout: time.Duration(timeoutSeconds) * time.Second,
 	}
 }

@@ -69,9 +69,3 @@ This creates a few common gaps in automation:
 Over time, this can leave libraries with permanently missing content or media that no longer matches your preferred quality and scoring standards.
 
 wArrden fills those gaps by periodically rechecking your library and automating the cleanup work that would otherwise require manual intervention.
-
-## Telemetry
-
-wArrden automatically reports unexpected application errors and anonymous lifecycle events. Automatic error reporting helps fix bugs faster without requiring any action from you. Telemetry is stored on official Neureka.Dev servers and is never provided to third parties.
-
-To disable error reporting and anonymous lifecycle analytics, add `TELEMETRY=false` to your `.env` file and restart wArrden.

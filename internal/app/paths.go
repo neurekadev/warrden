@@ -12,7 +12,6 @@ var (
 	configPath         = filepath.Join(dataDirectory, "config.yaml")
 	databasePath       = filepath.Join(dataDirectory, "warrden.db")
 	legacyDatabasePath = filepath.Join(dataDirectory, "warden.db")
-	installIDPath      = filepath.Join(dataDirectory, "install-id")
 )
 
 type databaseFile struct {

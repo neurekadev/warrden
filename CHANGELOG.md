@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- Remove all telemetry, including automatic error reporting, anonymous lifecycle events, the stored installation ID, and the `TELEMETRY` opt-out.
+
 ## [5.1.0] - 2026-08-25
 
 ### Added

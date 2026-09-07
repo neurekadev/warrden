@@ -47,7 +47,7 @@ func TestCleanerAppliesOrderedMixedActions(t *testing.T) {
 		{ID: 5, Title: stringPointer("healthy")},
 	}}
 	var buffer bytes.Buffer
-	out := output.New(&buffer, output.Info, time.UTC, nil)
+	out := output.New(&buffer, output.Info, time.UTC)
 	rules := []config.Rule{
 		{Match: "NO_FILES_ELIGIBLE", Action: config.RemoveAndBlocklist},
 		{Match: "NOT_QUALITY_UPGRADE", Action: config.Remove},
@@ -88,7 +88,7 @@ func TestCleanerDryRunDoesNotDelete(t *testing.T) {
 	t.Parallel()
 	client := &fakeClient{items: []arr.QueueItem{{ID: 1, ErrorMessage: stringPointer("Sample"), Title: stringPointer("release")}}}
 	var buffer bytes.Buffer
-	out := output.New(&buffer, output.Info, time.UTC, nil)
+	out := output.New(&buffer, output.Info, time.UTC)
 	rules := []config.Rule{{Match: "SAMPLE", Action: config.Remove}}
 	matched, err := New(client, config.Sonarr, true, rules, out).Run(context.Background())
 	if err != nil {
@@ -128,7 +128,7 @@ func TestCleanerSeparatesConfirmedAndIndeterminateSamples(t *testing.T) {
 			t.Parallel()
 			client := &fakeClient{items: []arr.QueueItem{{ID: 1, ErrorMessage: stringPointer("Unable to determine if file is a sample"), Title: stringPointer("release")}}}
 			var buffer bytes.Buffer
-			out := output.New(&buffer, output.Info, time.UTC, nil)
+			out := output.New(&buffer, output.Info, time.UTC)
 			matched, err := New(client, config.Sonarr, false, test.rules, out).Run(context.Background())
 			if err != nil {
 				t.Fatal(err)
@@ -147,7 +147,7 @@ func TestCleanerExcludesFailedDeletionsFromResults(t *testing.T) {
 	t.Parallel()
 	client := &fakeClient{failID: 1, items: []arr.QueueItem{{ID: 1, ErrorMessage: stringPointer("Sample"), Title: stringPointer("release")}}}
 	var buffer bytes.Buffer
-	out := output.New(&buffer, output.Info, time.UTC, nil)
+	out := output.New(&buffer, output.Info, time.UTC)
 	matched, err := New(client, config.Sonarr, false, []config.Rule{{Match: "SAMPLE", Action: config.Remove}}, out).Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
