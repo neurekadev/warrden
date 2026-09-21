@@ -42,6 +42,7 @@ func (r *Runner) Run(ctx context.Context, client *arr.Client, instance config.In
 	}
 	progress := r.output.Search(client.Instance(), jobName, job.MaxResults)
 	progress.Header()
+	defer progress.Trailer()
 
 	switch {
 	case instance.Kind == config.Sonarr || (instance.Kind == config.Whisparr && !instance.IsWhisparrEros()):
@@ -117,14 +118,12 @@ func (r *Runner) episodes(ctx context.Context, client *arr.Client, category stri
 			titles[index] = episodeTitle(episode)
 		}
 		r.output.Warn(contextName, "Search trigger failed for "+strings.Join(titles, ", "), err.Error())
-		progress.Trailer()
 		return nil
 	}
 	if err := r.cooldown.Mark(ctx, client.Instance(), category, selectedIDs); err != nil {
 		return err
 	}
 	r.applyTag(ctx, client, job.Tagging, func(tagID int) { r.tagger.Series(ctx, client, seriesIDs, tagID) })
-	progress.Trailer()
 	return nil
 }
 
@@ -208,7 +207,6 @@ func (r *Runner) seasons(ctx context.Context, client *arr.Client, category strin
 		}
 		r.applyTag(ctx, client, job.Tagging, func(tagID int) { r.tagger.Series(ctx, client, seriesIDs, tagID) })
 	}
-	progress.Trailer()
 	return nil
 }
 
@@ -264,14 +262,12 @@ func (r *Runner) movies(ctx context.Context, client *arr.Client, category string
 	}
 	if err := client.SearchMovies(ctx, selectedIDs); err != nil {
 		r.output.Warn(contextName, "Search trigger failed for "+strings.Join(titles, ", "), err.Error())
-		progress.Trailer()
 		return nil
 	}
 	if err := r.cooldown.Mark(ctx, client.Instance(), category, selectedIDs); err != nil {
 		return err
 	}
 	r.applyTag(ctx, client, job.Tagging, func(tagID int) { r.tagger.Movies(ctx, client, selectedIDs, tagID) })
-	progress.Trailer()
 	return nil
 }
 
@@ -329,14 +325,12 @@ func (r *Runner) albums(ctx context.Context, client *arr.Client, category string
 	}
 	if err := client.SearchAlbums(ctx, selectedIDs); err != nil {
 		r.output.Warn(contextName, "Search trigger failed for "+strings.Join(titles, ", "), err.Error())
-		progress.Trailer()
 		return nil
 	}
 	if err := r.cooldown.Mark(ctx, client.Instance(), category, selectedIDs); err != nil {
 		return err
 	}
 	r.applyTag(ctx, client, job.Tagging, func(tagID int) { r.tagger.Artists(ctx, client, artistIDs, tagID) })
-	progress.Trailer()
 	return nil
 }
 
@@ -417,7 +411,6 @@ func (r *Runner) artists(ctx context.Context, client *arr.Client, category strin
 		}
 		r.applyTag(ctx, client, job.Tagging, func(tagID int) { r.tagger.Artists(ctx, client, searched, tagID) })
 	}
-	progress.Trailer()
 	return nil
 }
 
