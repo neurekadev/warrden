@@ -2,7 +2,7 @@
 
 ## Purpose
 
-wArrden is a scheduled job runner that searches for missing/upgrade items and cleans stuck queue entries on Sonarr/Radarr instances. This file defines console log output formatting standards.
+wArrden is a Go scheduled job runner that searches for missing/upgrade items and cleans stuck queue entries on Sonarr, Radarr, Lidarr, and Whisparr instances. This file defines console log output formatting standards.
 
 ## Naming
 
@@ -19,7 +19,7 @@ Set via `logLevel` in `config.yaml`:
 | `warning` | WARN + ERROR |
 | `error` | ERROR only (least verbose) |
 
-All log messages go through `OutputService` methods and info writers to `Console.Out`. **`Console.Error` (`stderr`) and direct `Console.WriteLine` calls are forbidden for log output.** Containers (Docker, etc.) read stdout/stderr through separate pipes and merge them without preserving write order, which would cause tree-structured output to interleave. Writing everything to a single stream avoids this.
+All log messages go through `internal/output.Writer` and its specialized writers to the single stdout-backed `io.Writer` supplied by the application. **Direct writes to `os.Stdout` or `os.Stderr`, including `fmt.Print*` calls, are forbidden for log output.** Containers (Docker, etc.) read stdout/stderr through separate pipes and merge them without preserving write order, which would cause tree-structured output to interleave. Writing everything through the synchronized output writer avoids this.
 
 ## Log Format Rules
 
@@ -87,7 +87,7 @@ With detail:
 
 [07:45:01 ERROR] [warden.scheduler]
  ├─ Scheduled task error
- └─ InvalidOperationException: Unknown instance type: unknown
+ └─ *errors.errorString: unknown instance type: unknown
 ```
 
 ### Info (INFO) — Search Jobs (missing / upgrade)
@@ -202,7 +202,7 @@ Examples:
 - `The Boys (2019) - S01E01 - The Name of the Game`
 - `Game of Thrones (2011) - S01E01 - Winter Is Coming`
 
-Season and episode numbers are zero-padded to 2 digits (`D2`). A hyphen and space separate the year from the season indicator.
+Season and episode numbers are zero-padded to 2 digits (`%02d`). A hyphen and space separate the year from the season indicator.
 
 ### Movies
 
@@ -218,10 +218,11 @@ Year is only appended when greater than zero.
 
 ## Source Files
 
-- Log output: `OutputService`, `SearchOutputWriter` → `wArrden/Services/OutputService.cs`
-- Item title formatting: `SearchService.cs`, `QueueCleanupService.cs`
-- Queue cleanup rules: `wArrden/Services/QueueCleanupRuleMatchers.cs`, `wArrden/Services/QueueCleanupRule.cs`
-- API models: `wArrden/Clients/Models/`
+- Log output: `internal/output/writer.go`, `internal/output/search.go`, `internal/output/results.go`, `internal/output/banner.go`
+- Item title formatting: `internal/search/runner.go`, `internal/queue/cleaner.go`
+- Queue cleanup matching and actions: `internal/matcher/registry.go`, `internal/config/types.go`, `internal/queue/cleaner.go`
+- API client and models: `internal/arr/client.go`, `internal/arr/dto.go`, `internal/arr/types.go`
+- Application wiring and scheduling: `internal/app/run.go`, `internal/schedule/scheduler.go`
 
 ## API Call Verification via OpenAPI Specs
 
