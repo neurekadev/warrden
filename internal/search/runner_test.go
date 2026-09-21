@@ -137,6 +137,9 @@ func TestDryRunSkipsIndexerSearchAndCooldownWrite(t *testing.T) {
 	if strings.Contains(buffer.String(), "Results:") || !strings.Contains(buffer.String(), "No search performed") {
 		t.Fatalf("unexpected dry-run output:\n%s", buffer.String())
 	}
+	if !strings.HasSuffix(buffer.String(), "\n\n") {
+		t.Fatalf("search output is not separated from the next job:\n%q", buffer.String())
+	}
 }
 
 func TestSeasonSearchRecordsOnlySuccessfulGroups(t *testing.T) {
