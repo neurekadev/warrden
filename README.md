@@ -23,7 +23,7 @@ Download [`compose.yaml`](./compose.yaml) and [`.env.example`](./.env.example).
 
 ## Usage
 
-Queue cleanup defaults to aggressive, set-and-forget automation: release-specific failures are removed and usually blocklisted, eliminating most manual maintenance but sometimes blacklisting healthy releases. Recoverable system and metadata failures remain queued instead of being deleted. `SAMPLE_INDETERMINATE` is inactive because media-probing failures—especially on remote mounts, though possible locally—can affect healthy files; adjust matcher actions for more conservative cleanup.
+Queue cleanup defaults to aggressive automation: release failures are removed and usually blocklisted, while recoverable system or metadata failures stay queued. `SAMPLE_INDETERMINATE` stays inactive because probing failures can affect healthy files, especially on remote mounts. Local media is significantly less risky, so set this matcher to `removeAndBlocklist` for fully aggressive cleanup.
 
 ## Features
 
