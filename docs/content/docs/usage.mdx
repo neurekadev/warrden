@@ -1,0 +1,61 @@
+---
+title: Usage
+description: Operate search jobs, queue cleanup, dry runs, and cooldown commands.
+---
+
+## Scheduled searches
+
+Missing search targets monitored items that have not been downloaded. Upgrade search targets wanted items that already exist but no longer meet the arr application's cutoff or custom-format goals.
+
+Each run:
+
+- removes expired cooldown entries;
+- fetches wanted items from the arr instance;
+- excludes items that are still on cooldown;
+- randomly selects up to `maxResults` eligible items;
+- checks that an automatic-search indexer remains available; and
+- records successfully triggered searches in the cooldown database.
+
+Sonarr and standard Whisparr can search by `episode` or `season`. Lidarr can search by `album` or `artist`. Radarr and Whisparr Eros search movies.
+
+## Queue cleanup
+
+Queue cleanup considers an item a warning when its tracked-download status is `warning`, it has status messages, or it has a non-empty error message. Configured matcher rules are evaluated in order. The first matching active rule decides the action:
+
+| Action | Result |
+| --- | --- |
+| `remove` | Delete the queue item without blocklisting the release. |
+| `removeAndBlocklist` | Delete the queue item and ask the arr application to blocklist the release. |
+| `none` | Leave that matcher inactive. |
+
+The complete matcher catalog and exact arr messages are documented in [`config.example.yaml`](https://github.com/neurekadev/warrden/blob/main/config.example.yaml).
+
+## Dry-run mode
+
+Set `DRY_RUN=true` in `.env` and recreate the container. Queue cleanup reports actions as **Would remove** or **Would blocklist**, and search jobs do not trigger searches.
+
+## Clear search cooldowns
+
+Clear all cooldowns in a category:
+
+```bash
+docker exec warrden clear-missing
+docker exec warrden clear-upgrades
+```
+
+Limit the operation to one configured instance by passing its `name`:
+
+```bash
+docker exec warrden clear-missing Series
+docker exec warrden clear-upgrades Movies
+```
+
+Instance matching is case-insensitive. The command reports each affected instance and the number of removed cooldown entries.
+
+## Read logs
+
+```bash
+docker compose logs -f warrden
+```
+
+Set `logLevel` in `config.yaml` to `debug`, `info`, `warning`, or `error`. The default is `info`.

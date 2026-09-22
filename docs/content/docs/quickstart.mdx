@@ -1,0 +1,71 @@
+---
+title: Quickstart
+description: Start wArrden with Docker Compose and one enabled arr instance.
+---
+
+## Requirements
+
+- Docker with the Compose plugin
+- A reachable Radarr, Sonarr, Lidarr, or Whisparr instance
+- The API key from **Settings → General** in that arr application
+
+## 1. Download the deployment files
+
+```bash
+mkdir warrden && cd warrden
+curl -LO https://raw.githubusercontent.com/neurekadev/warrden/main/compose.yaml
+curl -Lo config.yaml https://raw.githubusercontent.com/neurekadev/warrden/main/config.example.yaml
+curl -Lo .env https://raw.githubusercontent.com/neurekadev/warrden/main/.env.example
+```
+
+The supplied Compose file uses `ghcr.io/neurekadev/warrden:5`, persists state in a named volume, and mounts `config.yaml` at `/app/data/config.yaml`.
+
+## 2. Configure an instance
+
+Open `config.yaml`, find the block for your arr application, and set at least these fields:
+
+```yaml
+instances:
+  - type: sonarr
+    enabled: true
+    name: Series
+    url: http://sonarr:8989
+    apiVersion: v3
+    apiKey: YOUR_SONARR_API_KEY
+```
+
+Keep the job sections from the example file, then adjust their schedules and limits when you are ready. Instance names must be unique.
+
+If the arr application is outside the Compose network, use a URL that is reachable from inside the wArrden container.
+
+## 3. Preview actions
+
+Set dry-run mode in `.env` before the first start:
+
+```dotenv
+DRY_RUN=true
+```
+
+Dry-run mode leaves queues and searches unchanged while showing what cleanup rules would match.
+
+## 4. Start wArrden
+
+```bash
+docker compose up -d
+docker compose logs -f warrden
+```
+
+Confirm the startup summary lists the expected instance and scheduled jobs. When the output looks correct, change `DRY_RUN=false` and recreate the container:
+
+```bash
+docker compose up -d --force-recreate
+```
+
+## Updating
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+The named `data` volume keeps cooldown history across image updates.

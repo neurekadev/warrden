@@ -1,0 +1,213 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/**
+      - .github/workflows/Docs.yaml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Image ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Docs AMD64
+            component: warrden-docs
+            arch: amd64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+          - name: Docs ARM64
+            component: warrden-docs
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+    env:
+      IMAGE: ghcr.io/neurekadev/warrden-docs
+      SOURCE_VERSION: edge
+
+    steps:
+      - name: Check Out Repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log In to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Extract Image Metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=wArrden Docs
+            org.opencontainers.image.description=End-user documentation for wArrden
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.version=${{ env.SOURCE_VERSION }}
+          annotations: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=wArrden Docs
+            org.opencontainers.image.description=End-user documentation for wArrden
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.version=${{ env.SOURCE_VERSION }}
+
+      - name: Build Platform Image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: docs
+          file: docs/Dockerfile
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          labels: ${{ steps.metadata.outputs.labels }}
+          annotations: ${{ steps.metadata.outputs.annotations }}
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            GIT_TAG=${{ env.SOURCE_VERSION }}
+            GIT_HASH=${{ github.sha }}
+          cache-from: type=gha,scope=publish-${{ matrix.component }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=publish-${{ matrix.component }}-${{ matrix.arch }},mode=max,ignore-error=true
+
+      - name: Export Image Digest
+        shell: bash
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Build produced an invalid digest: $DIGEST" >&2
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+
+      - name: Upload Image Digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ matrix.component }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish Docs
+    needs:
+      - build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/neurekadev/warrden-docs
+      SOURCE_VERSION: edge
+
+    steps:
+      - name: Download Image Digests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: digests-warrden-docs-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+
+      - name: Log In to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Extract Image Metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: ${{ env.IMAGE }}
+          tags: type=raw,value=edge
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=wArrden Docs
+            org.opencontainers.image.description=End-user documentation for wArrden
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.version=${{ env.SOURCE_VERSION }}
+          annotations: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.title=wArrden Docs
+            org.opencontainers.image.description=End-user documentation for wArrden
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.version=${{ env.SOURCE_VERSION }}
+
+      - name: Create Multi-Platform Manifest
+        shell: bash
+        env:
+          DIGESTS: ${{ runner.temp }}/digests
+          TAGS: ${{ steps.metadata.outputs.tags }}
+        run: |
+          set -euo pipefail
+          mapfile -t digest_files < <(find "$DIGESTS" -maxdepth 1 -type f -printf '%f\n' | sort)
+          if [[ "${#digest_files[@]}" -ne 2 ]]; then
+            echo "Expected two platform digests, found ${#digest_files[@]}." >&2
+            exit 1
+          fi
+
+          sources=()
+          for digest in "${digest_files[@]}"; do
+            if [[ ! "$digest" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "Invalid digest filename: $digest" >&2
+              exit 1
+            fi
+            sources+=("$IMAGE@sha256:$digest")
+          done
+
+          tag_args=()
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              tag_args+=(--tag "$tag")
+            fi
+          done <<< "$TAGS"
+          if [[ "${#tag_args[@]}" -eq 0 ]]; then
+            echo "No image tags were generated." >&2
+            exit 1
+          fi
+
+          docker buildx imagetools create "${tag_args[@]}" "${sources[@]}"
+
+      - name: Verify Multi-Platform Manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(docker buildx imagetools inspect --raw "$IMAGE:$SOURCE_VERSION")"
+          for platform in linux/amd64 linux/arm64; do
+            os="${platform%/*}"
+            architecture="${platform#*/}"
+            jq -e --arg os "$os" --arg architecture "$architecture" \
+              'any(.manifests[]?; .platform.os == $os and .platform.architecture == $architecture)' \
+              <<< "$manifest" >/dev/null
+          done

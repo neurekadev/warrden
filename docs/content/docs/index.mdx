@@ -1,0 +1,33 @@
+---
+title: Overview
+description: What wArrden automates and which arr applications it supports.
+---
+
+wArrden is a scheduled job runner for media libraries. It connects to one or more arr instances, searches for monitored content that is missing or upgradeable, and handles queue entries that are stuck on known import warnings.
+
+It is designed to run continuously as a container. Each configured instance has its own schedules, search limits, cooldowns, indexer filters, and cleanup behavior.
+
+## Supported applications
+
+| Application | API | Queue cleanup | Missing search | Upgrade search |
+| --- | --- | --- | --- | --- |
+| Radarr | `v3` | Yes | Yes | Yes |
+| Sonarr | `v3` | Yes | Yes | Yes |
+| Lidarr | `v1` | Yes | Yes | Yes |
+| Whisparr | `v3`, `v3-eros` | Yes | Yes | Yes |
+
+## How it works
+
+1. A five-field cron expression starts each enabled job.
+2. Search jobs fetch wanted items, discard anything still on cooldown, choose up to the configured limit, and ask the arr instance to search.
+3. Queue cleanup inspects warning and error messages, applies the first matching configured rule, and removes or blocklists the item when that rule is active.
+4. Results and summary statistics are written to the container log.
+
+Search cooldowns are stored in `/app/data/warrden.db`, so the data volume should persist across container replacements.
+
+<Cards>
+  <Card title="Quickstart" description="Run wArrden with Docker Compose." href="/docs/quickstart" />
+  <Card title="Configuration" description="Configure instances, jobs, and cleanup rules." href="/docs/configuration" />
+  <Card title="Usage" description="Understand searches, cleanup, dry runs, and CLI commands." href="/docs/usage" />
+  <Card title="Troubleshooting" description="Resolve common startup and runtime warnings." href="/docs/troubleshooting" />
+</Cards>
