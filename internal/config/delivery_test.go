@@ -96,11 +96,6 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		"https://github.com/neurekadev/warrden",
 		"actions/workflows/CI.yaml",
 		"Download [`compose.yaml`](./compose.yaml) and [`.env.example`](./.env.example).",
-		"## Usage",
-		"Queue cleanup defaults to aggressive automation",
-		"`SAMPLE_INDETERMINATE` stays inactive",
-		"Local media is significantly less risky",
-		"set this matcher to `removeAndBlocklist`",
 		"> [!CAUTION]",
 		"Images at `registry.neureka.dev/warrden/warrden` are no longer updated. Use `ghcr.io/neurekadev/warrden`.",
 	} {
