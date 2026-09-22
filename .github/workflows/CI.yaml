@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
     tags: ["[0-9]*.[0-9]*.[0-9]*"]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions: {}
@@ -79,8 +77,8 @@ jobs:
 
   build:
     name: Build ${{ matrix.name }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: read
     env:
@@ -89,25 +87,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Go
-            kind: go
-            runner: ubuntu-24.04
-          - name: Image AMD64
-            kind: container
-            component: warrden
-            context: .
-            dockerfile: Dockerfile
+          - name: Linux AMD64
+            goos: linux
             arch: amd64
-            runner: ubuntu-24.04
-            platform: linux/amd64
-          - name: Image ARM64
-            kind: container
-            component: warrden
-            context: .
-            dockerfile: Dockerfile
+            output: warrden-linux-amd64
+          - name: Linux ARM64
+            goos: linux
             arch: arm64
-            runner: ubuntu-24.04-arm
-            platform: linux/arm64
+            output: warrden-linux-arm64
 
     steps:
       - name: Check Out Repository
@@ -116,68 +103,38 @@ jobs:
           persist-credentials: false
 
       - name: Set Up Go
-        if: matrix.kind == 'go'
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
       - name: Build Go Packages
-        if: matrix.kind == 'go'
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.arch }}
         run: go build ./...
 
-      - name: Build Release Targets
-        if: matrix.kind == 'go'
-        shell: bash
-        run: |
-          set -euo pipefail
-          for arch in amd64 arm64; do
-            GOOS=linux GOARCH="$arch" go build \
-              -trimpath \
-              -buildvcs=false \
-              -o "$RUNNER_TEMP/warrden-$arch" \
-              ./cmd/warrden
-          done
+      - name: Build Release Binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.arch }}
+          OUTPUT: ${{ runner.temp }}/${{ matrix.output }}
+        run: go build -trimpath -buildvcs=false -o "$OUTPUT" ./cmd/warrden
 
-      - name: Validate Compose Model
-        if: matrix.kind == 'go'
-        shell: bash
-        run: |
-          set -euo pipefail
-          cp .env.example .env
-          docker compose config --quiet
-
-      - name: Set Up Docker Buildx
-        if: matrix.kind == 'container'
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build Image
-        if: matrix.kind == 'container'
-        uses: docker/build-push-action@v7
+      - name: Upload Release Binary
+        uses: actions/upload-artifact@v7
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platform }}
-          push: false
-          provenance: false
-          sbom: false
-          build-args: |
-            GIT_TAG=ci
-            GIT_HASH=${{ github.sha }}
-          cache-from: type=gha,scope=ci-${{ matrix.component }}-${{ matrix.arch }}
-          cache-to: type=gha,scope=ci-${{ matrix.component }}-${{ matrix.arch }},mode=max,ignore-error=true
+          name: release-binaries-${{ matrix.goos }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/${{ matrix.output }}
+          if-no-files-found: error
+          retention-days: 1
 
-  publish-platforms:
-    name: Publish ${{ matrix.name }}
-    if: >-
-      (github.event_name == 'push' &&
-      (github.ref == 'refs/heads/main' || github.ref_type == 'tag')) ||
-      (github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository)
+  build-images:
+    name: Build Image ${{ matrix.name }}
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs:
       - lint
       - unit-tests
-      - build
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     permissions:
@@ -204,9 +161,10 @@ jobs:
             runner: ubuntu-24.04-arm
             platform: linux/arm64
     env:
-      CACHE_PREFIX: ${{ github.event_name == 'pull_request' && 'ci' || 'publish' }}
+      CACHE_PREFIX: ${{ (github.ref_type == 'tag' || github.ref == 'refs/heads/main') && 'publish' || 'ci' }}
       IMAGE: ghcr.io/${{ github.repository }}
-      SOURCE_VERSION: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.ref_type == 'tag' && github.ref_name || 'edge') }}
+      PUBLISH_IMAGE: ${{ github.ref_type == 'tag' || github.ref == 'refs/heads/main' }}
+      SOURCE_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || (github.ref == 'refs/heads/main' && 'edge' || 'dev') }}
 
     steps:
       - name: Check Out Repository
@@ -218,6 +176,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Log In to GHCR
+        if: env.PUBLISH_IMAGE == 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -244,25 +203,28 @@ jobs:
             org.opencontainers.image.licenses=MIT
             org.opencontainers.image.version=${{ env.SOURCE_VERSION }}
 
-      - name: Build and Publish Platform Image
+      - name: Build Platform Image
         id: build
         uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           platforms: ${{ matrix.platform }}
-          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          outputs: ${{ env.PUBLISH_IMAGE == 'true' && format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', env.IMAGE) || '' }}
           labels: ${{ steps.metadata.outputs.labels }}
           annotations: ${{ steps.metadata.outputs.annotations }}
-          provenance: mode=max
-          sbom: true
+          provenance: ${{ env.PUBLISH_IMAGE == 'true' && 'mode=max' || 'false' }}
+          sbom: ${{ env.PUBLISH_IMAGE == 'true' }}
           build-args: |
             GIT_TAG=${{ env.SOURCE_VERSION }}
             GIT_HASH=${{ github.sha }}
-          cache-from: type=gha,scope=${{ env.CACHE_PREFIX }}-${{ matrix.component }}-${{ matrix.arch }}
+          cache-from: |
+            type=gha,scope=${{ env.CACHE_PREFIX }}-${{ matrix.component }}-${{ matrix.arch }}
+            ${{ env.CACHE_PREFIX == 'ci' && format('type=gha,scope=publish-{0}-{1}', matrix.component, matrix.arch) || '' }}
           cache-to: type=gha,scope=${{ env.CACHE_PREFIX }}-${{ matrix.component }}-${{ matrix.arch }},mode=max,ignore-error=true
 
-      - name: Export Digest
+      - name: Export Image Digest
+        if: env.PUBLISH_IMAGE == 'true'
         shell: bash
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -275,7 +237,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/digests"
           touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
 
-      - name: Upload Digest
+      - name: Upload Image Digest
+        if: env.PUBLISH_IMAGE == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: digests-${{ matrix.component }}-${{ matrix.arch }}
@@ -285,13 +248,12 @@ jobs:
 
   publish:
     name: Publish Image
-    if: >-
-      (github.event_name == 'push' &&
-      (github.ref == 'refs/heads/main' || github.ref_type == 'tag')) ||
-      (github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
     needs:
-      - publish-platforms
+      - lint
+      - unit-tests
+      - build
+      - build-images
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -299,10 +261,10 @@ jobs:
       packages: write
     env:
       IMAGE: ghcr.io/${{ github.repository }}
-      SOURCE_VERSION: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || (github.ref_type == 'tag' && github.ref_name || 'edge') }}
+      SOURCE_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'edge' }}
 
     steps:
-      - name: Download Digests
+      - name: Download Image Digests
         uses: actions/download-artifact@v8
         with:
           pattern: digests-warrden-*
@@ -316,9 +278,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Set Up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
       - name: Extract Image Metadata
         id: metadata
         uses: docker/metadata-action@v6
@@ -328,7 +287,6 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: latest=auto
           tags: |
-            type=ref,event=pr
             type=edge
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -407,6 +365,7 @@ jobs:
       - lint
       - unit-tests
       - build
+      - build-images
       - publish
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -420,8 +379,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Download Release Binaries
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-binaries-*
+          path: release-assets
+          merge-multiple: true
+
       - name: Create Release
-        uses: neurekadev/create-release-action@1
+        uses: neurekadev/create-release-action@2
         with:
           github-token: ${{ github.token }}
           api-key: ${{ secrets.INFERENCE_API_KEY }}
+          base-url: https://api.openai.com/v1
+          model: gpt-5.6-luna
+          reasoning-effort: xhigh
+          files: release-assets/**
