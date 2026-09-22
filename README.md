@@ -17,12 +17,13 @@ wArrden makes it easy to maintain your media libraries by finding missing or upg
 > [!CAUTION]
 > Images at `registry.neureka.dev/warrden/warrden` are no longer updated. Use `ghcr.io/neurekadev/warrden`.
 
-> [!TIP]
-> The `config.example.yaml` file can look overwhelming, but you don't need to understand every option to get started. Just add your arr URL and API key, then enable the instance — the defaults handle the rest.
-
 ## Quickstart
 
 Download [`compose.yaml`](./compose.yaml) and [`.env.example`](./.env.example).
+
+## Usage
+
+Queue cleanup defaults to aggressive, set-and-forget automation: release-specific failures are removed and usually blocklisted, eliminating most manual maintenance but sometimes blacklisting healthy releases. Recoverable system and metadata failures remain queued instead of being deleted. `SAMPLE_INDETERMINATE` is inactive because media-probing failures—especially on remote mounts, though possible locally—can affect healthy files; adjust matcher actions for more conservative cleanup.
 
 ## Features
 

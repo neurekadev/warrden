@@ -115,19 +115,48 @@ func TestParseExample(t *testing.T) {
 	}
 	rulesByKind := map[string][]Rule{"sonarr": cfg.QueueRules.Sonarr, "radarr": cfg.QueueRules.Radarr, "lidarr": cfg.QueueRules.Lidarr, "whisparr": cfg.QueueRules.Whisparr}
 	wantCounts := map[string]int{"sonarr": 29, "radarr": 20, "lidarr": 26, "whisparr": 30}
+	removeDefaults := map[string]struct{}{
+		"NOT_QUALITY_UPGRADE": {}, "NOT_REVISION_UPGRADE": {}, "NOT_CUSTOM_FORMAT_UPGRADE": {},
+		"MOVIE_ALREADY_IMPORTED": {}, "EPISODE_ALREADY_IMPORTED": {}, "ALBUM_ALREADY_IMPORTED": {},
+	}
+	noneDefaults := map[string]struct{}{
+		"SAMPLE_INDETERMINATE": {}, "INSUFFICIENT_FREE_SPACE": {}, "FILE_UNPACKING": {},
+		"UNEXPECTED_ERROR": {}, "LOCKED_FILE": {}, "DOWNLOAD_CLIENT_ERROR": {}, "IMPORT_PATH_INACCESSIBLE": {},
+	}
+	noneByKind := map[string]map[string]struct{}{
+		"sonarr": {
+			"TITLE_MISSING": {}, "TITLE_TBA": {}, "MISSING_ABSOLUTE_NUMBER": {}, "UNVERIFIED_SCENE_MAPPING": {},
+		},
+		"lidarr": {"DEST_FOLDER_NOT_ROOT": {}},
+		"whisparr": {
+			"TITLE_MISSING": {}, "TITLE_TBA": {}, "MISSING_ABSOLUTE_NUMBER": {}, "UNVERIFIED_SCENE_MAPPING": {},
+		},
+	}
+	actionCounts := make(map[Action]int)
 	for kind, rules := range rulesByKind {
 		if len(rules) != wantCounts[kind] {
 			t.Errorf("%s rules=%d, want %d", kind, len(rules), wantCounts[kind])
 		}
-		actions := make(map[string]Action, len(rules))
 		for _, rule := range rules {
-			actions[rule.Match] = rule.Action
+			want := RemoveAndBlocklist
+			if _, ok := removeDefaults[rule.Match]; ok {
+				want = Remove
+			}
+			if _, ok := noneDefaults[rule.Match]; ok {
+				want = None
+			}
+			if _, ok := noneByKind[kind][rule.Match]; ok {
+				want = None
+			}
+			if rule.Action != want {
+				t.Errorf("%s %s action=%q, want %q", kind, rule.Match, rule.Action, want)
+			}
+			actionCounts[rule.Action]++
 		}
-		if got := actions["SAMPLE"]; got != RemoveAndBlocklist {
-			t.Errorf("%s SAMPLE action=%q, want %q", kind, got, RemoveAndBlocklist)
-		}
-		if got := actions["SAMPLE_INDETERMINATE"]; got != None {
-			t.Errorf("%s SAMPLE_INDETERMINATE action=%q, want %q", kind, got, None)
+	}
+	for action, want := range map[Action]int{RemoveAndBlocklist: 52, Remove: 16, None: 37} {
+		if got := actionCounts[action]; got != want {
+			t.Errorf("%s defaults=%d, want %d", action, got, want)
 		}
 	}
 	warning := "# WARNING: Stale rclone/FUSE mounts or other network storage read failures can trigger this for healthy files."
