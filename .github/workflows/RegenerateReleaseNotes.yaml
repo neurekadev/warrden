@@ -36,9 +36,12 @@ jobs:
           persist-credentials: false
 
       - name: Regenerate Release Notes
-        uses: neurekadev/create-release-action@1
+        uses: neurekadev/create-release-action@2
         with:
           github-token: ${{ github.token }}
           api-key: ${{ secrets.INFERENCE_API_KEY }}
+          base-url: https://api.openai.com/v1
+          model: gpt-5.6-luna
+          reasoning-effort: xhigh
           release-tag: ${{ inputs.release-tag }}
           release-notes-audience: ${{ inputs.release-notes-audience }}
