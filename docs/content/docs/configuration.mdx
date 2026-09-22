@@ -1,0 +1,97 @@
+---
+title: Configuration
+description: Configure arr instances, search jobs, cleanup rules, and runtime settings.
+---
+
+wArrden reads `/app/data/config.yaml`. With the supplied Compose file, edit `config.yaml` beside `compose.yaml` and recreate the container after every change.
+
+[`config.example.yaml`](https://github.com/neurekadev/warrden/blob/main/config.example.yaml) is the authoritative, fully commented reference. It includes every supported instance type and every queue-cleanup matcher.
+
+## Top-level settings
+
+| Field | Meaning |
+| --- | --- |
+| `logLevel` | Minimum console severity: `debug`, `info`, `warning`, or `error`. Defaults to `info`. |
+| `instances` | One or more arr instance definitions. Names must be unique. |
+| `queueCleanupRules` | Ordered matcher lists for Radarr, Sonarr, Lidarr, and Whisparr. |
+
+Unknown YAML keys are rejected so misspelled settings cannot silently change behavior.
+
+## Instance fields
+
+| Field | Meaning |
+| --- | --- |
+| `type` | `radarr`, `sonarr`, `lidarr`, or `whisparr`. |
+| `enabled` | Disables the entire instance when `false`; no API calls are made. |
+| `name` | Unique label used in logs and cooldown commands. |
+| `url` | Absolute HTTP or HTTPS URL reachable from the container. |
+| `apiVersion` | Radarr/Sonarr `v3`, Lidarr `v1`, or Whisparr `v3`/`v3-eros`. |
+| `apiKey` | API key from the arr application's general settings. |
+| `missingSearch` | Missing-content job settings. |
+| `upgradeSearch` | Upgrade job settings. |
+| `queueCleanup` | Queue cleanup schedule. |
+| `indexerFilter` | Optional case-insensitive include and exclude lists for automatic-search indexers. Exclusions win. |
+
+## Search job fields
+
+Search jobs use a five-field cron expression: `minute hour day-of-month month day-of-week`.
+
+```yaml
+missingSearch:
+  enabled: true
+  searchType: season
+  cron: "*/15 * * * *"
+  maxResults: 1
+  cooldown: 30d
+  tagging:
+    enabled: false
+    name: "warrden-missing"
+    retroactive: false
+```
+
+- `maxResults` is the maximum number of items or groups searched per run.
+- `cooldown` accepts combined day, hour, minute, and second durations such as `30d`, `12h`, or `1h30m`.
+- `searchType` is required for Sonarr/standard Whisparr (`episode` or `season`) and Lidarr (`album` or `artist`).
+- When tagging is enabled, wArrden creates or finds the named arr tag and applies it after a successful search. Set `retroactive: true` for one startup only if existing searched items also need the tag.
+
+The example defaults use a 30-day missing cooldown and a 90-day upgrade cooldown. Shorter cooldowns increase indexer traffic.
+
+## Indexer filters
+
+```yaml
+indexerFilter:
+  enabled: true
+  include:
+    - NZBGeek
+    - DrunkenSlug
+  exclude:
+    - NZBGeek
+```
+
+Only indexers enabled for automatic search are considered. When `include` is non-empty, an indexer must appear there; `exclude` always takes priority.
+
+## Queue-cleanup rules
+
+```yaml
+queueCleanupRules:
+  sonarr:
+    - match: NOT_QUALITY_UPGRADE
+      action: remove
+    - match: SAMPLE
+      action: removeAndBlocklist
+    - match: SAMPLE_INDETERMINATE
+      action: none
+```
+
+Rules are ordered, and the first matching active rule wins. Keep `SAMPLE_INDETERMINATE` inactive unless you accept the risk that transient media-probing failures, including failures on remote mounts, can affect healthy downloads.
+
+## Environment settings
+
+The supplied `.env.example` exposes:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PUID` | `1000` | User ID applied to the writable data directory and process. |
+| `PGID` | `1000` | Group ID applied with `PUID`; both values must be set together. |
+| `TZ` | `UTC` | IANA timezone used for schedules and timestamps. |
+| `DRY_RUN` | `false` | Preview cleanup matches without changing queues or triggering searches. |

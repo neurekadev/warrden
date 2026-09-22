@@ -1,0 +1,50 @@
+---
+title: Troubleshooting
+description: Diagnose configuration, connectivity, indexer, and queue-cleanup problems.
+---
+
+Start with the live container output:
+
+```bash
+docker compose logs -f warrden
+```
+
+Temporarily set `logLevel: debug` in `config.yaml` when the normal summary does not show enough detail.
+
+## Config file not found
+
+wArrden expects `data/config.yaml` inside its working directory, which is `/app/data/config.yaml` in the image. Confirm `config.yaml` exists beside `compose.yaml` and that the Compose volume still contains:
+
+```yaml
+- ./config.yaml:/app/data/config.yaml
+```
+
+Creating the container before the host file exists can create the wrong mount shape. Create the file first, then recreate the container.
+
+## No jobs are scheduled
+
+At least one instance and one job within it must have `enabled: true`. Disabled instances make no API calls. Queue cleanup also needs at least one configured rule for that instance type.
+
+## API key rejected
+
+An HTTP 401 or 403 disables that instance for the life of the current process. Correct the API key in `config.yaml`, then recreate the container so wArrden validates it again.
+
+## Instance cannot be reached
+
+Connection and other environmental failures are reported as warnings and retried on the next scheduled cycle. Verify that the configured `url` resolves and is reachable from inside the container network.
+
+## Search says no enabled indexers
+
+wArrden only uses indexers that the arr application marks for automatic search. Check that at least one is enabled. If `indexerFilter` is active, compare its case-insensitive `include` and `exclude` names with the available indexer names; exclusions take priority.
+
+## Queue items are not cleaned
+
+Only warning items are evaluated. A matcher with `action: none` is intentionally inactive, and an unknown matcher key is skipped with a startup warning. Compare the queue message with the exact messages documented in [`config.example.yaml`](https://github.com/neurekadev/warrden/blob/main/config.example.yaml).
+
+## Timestamps or schedules use UTC
+
+Set `TZ` to a valid IANA timezone such as `America/Los_Angeles`. An invalid value produces a warning and falls back to UTC.
+
+## Container identity setup fails
+
+`PUID` and `PGID` must either both be zero or both be positive integers, and they must be supplied together. The container also needs permission to update ownership of `/app/data` during startup.
