@@ -260,6 +260,21 @@ Do not store the fetched OpenAPI specs in the repository; fetch them on demand p
 - Matcher keys that are listed but recommended as inactive ship with `action: none`.
 - **Duplicate comments must stay identical.** When the same config key appears in multiple instance blocks (e.g. `type`, `cron`, `cooldown`), its comment text must match exactly across all copies. This ensures every instance block is fully self-documenting for copy-paste and prevents comment drift.
 
+### Queue Cleanup Default Policy
+
+Queue cleanup defaults favor aggressive, unattended automation. Classify every matcher by cause:
+
+- Bad or unsuitable releases default to `removeAndBlocklist`.
+- Valid but redundant releases default to `remove`: `NOT_QUALITY_UPGRADE`, `NOT_REVISION_UPGRADE`, `NOT_CUSTOM_FORMAT_UPGRADE`, `MOVIE_ALREADY_IMPORTED`, `EPISODE_ALREADY_IMPORTED`, and `ALBUM_ALREADY_IMPORTED`.
+- Recoverable environment or metadata conditions default to `none`: `SAMPLE_INDETERMINATE`, `INSUFFICIENT_FREE_SPACE`, `FILE_UNPACKING`, `UNEXPECTED_ERROR`, `LOCKED_FILE`, `DOWNLOAD_CLIENT_ERROR`, and `IMPORT_PATH_INACCESSIBLE`.
+- Sonarr and Whisparr also default `TITLE_MISSING`, `TITLE_TBA`, `MISSING_ABSOLUTE_NUMBER`, and `UNVERIFIED_SCENE_MAPPING` to `none`.
+- Lidarr also defaults `DEST_FOLDER_NOT_ROOT` to `none`.
+- All other applicable matcher keys default to `removeAndBlocklist`.
+
+New matcher keys must be classified using this policy. Every default-policy change must update `config.example.yaml`, its YAML comments, `README.md` when user-facing behavior changes, and the default-action regression coverage in `internal/config/config_test.go`.
+
+`SAMPLE_INDETERMINATE` must remain `none` unless an explicit policy decision changes it. Media-probing failures can affect healthy files, especially on remote mounts, and can also occur on local media.
+
 ### Comment Format
 
 Use these YAML comment conventions to keep the config self-documenting:

@@ -545,8 +545,11 @@ instances:
         - NZBGeek
 
 
-# The defaults below work for most setups — you don't need to change
-# anything unless the default actions don't match your preferences.
+# The defaults below favor aggressive, unattended queue cleanup.
+# Release-specific failures are usually removed and blocklisted, while valid but
+# redundant releases are removed without blocklisting. Recoverable environment
+# and metadata conditions remain queued with action none.
+# Review these rules if you prefer more conservative cleanup.
 #
 # Actions: remove | removeAndBlocklist | none
 queueCleanupRules:
@@ -609,19 +612,21 @@ queueCleanupRules:
       action: removeAndBlocklist
 
     # Not enough disk space to import the file.
+    # Keep this rule set to none because removing or blocklisting a release does not restore disk space.
     # Radarr: "Not enough free space"
     - match: INSUFFICIENT_FREE_SPACE
-      action: removeAndBlocklist
+      action: none
 
     # File is still being extracted/unraring.
+    # Keep this rule set to none so the arr can retry after extraction finishes.
     # Radarr: "File is still being unpacked"
     - match: FILE_UNPACKING
-      action: remove
+      action: none
 
     # Couldn't identify what movie this file is.
     # Radarr: "Unable to parse file"
     - match: UNABLE_TO_PARSE
-      action: none
+      action: removeAndBlocklist
 
     # Something went wrong during import processing.
     # Radarr: "Unexpected error processing file"
@@ -636,13 +641,13 @@ queueCleanupRules:
     # File type is not a supported video format.
     # Radarr: "Invalid video file, unsupported extension: '{extension}'"
     - match: UNSUPPORTED_EXTENSION
-      action: none
+      action: removeAndBlocklist
 
     # Potentially harmful executable file found in download.
     # Radarr: "Caution: Found executable file with extension: '{extension}'"
     # Radarr: "Caution: Found potentially dangerous file with extension: {extension}"
     - match: DANGEROUS_FILE
-      action: none
+      action: removeAndBlocklist
 
     # Download client is reporting a generic error — investigate the download client.
     # Radarr: "qBittorrent is reporting an error", "Deluge is reporting an error", "uTorrent is reporting an error"
@@ -730,19 +735,21 @@ queueCleanupRules:
       action: removeAndBlocklist
 
     # Not enough disk space to import the file.
+    # Keep this rule set to none because removing or blocklisting a release does not restore disk space.
     # Sonarr: "Not enough free space"
     - match: INSUFFICIENT_FREE_SPACE
-      action: removeAndBlocklist
+      action: none
 
     # File is still being extracted/unraring.
+    # Keep this rule set to none so the arr can retry after extraction finishes.
     # Sonarr: "File is still being unpacked"
     - match: FILE_UNPACKING
-      action: remove
+      action: none
 
     # Couldn't identify what show this file is.
     # Sonarr: "Unable to parse file"
     - match: UNABLE_TO_PARSE
-      action: none
+      action: removeAndBlocklist
 
     # Something went wrong during import processing.
     # Sonarr: "Unexpected error processing file"
@@ -757,13 +764,13 @@ queueCleanupRules:
     # File type is not a supported video format.
     # Sonarr: "Invalid video file, unsupported extension: '{0}'"
     - match: UNSUPPORTED_EXTENSION
-      action: none
+      action: removeAndBlocklist
 
     # Potentially harmful executable file found in download.
     # Sonarr: "Caution: Found executable file with extension: '{0}'"
     # Sonarr: "Caution: Found potentially dangerous file with extension: {0}"
     - match: DANGEROUS_FILE
-      action: none
+      action: removeAndBlocklist
 
     # Download client is reporting a generic error — investigate the download client.
     # Sonarr: "qBittorrent is reporting an error", "Deluge is reporting an error", "uTorrent is reporting an error"
@@ -788,12 +795,12 @@ queueCleanupRules:
     # File on disk already has more episodes than this one.
     # Sonarr: "Episode file on disk contains more episodes than this file contains"
     - match: EXISTING_FILE_MORE_EPISODES
-      action: none
+      action: removeAndBlocklist
 
     # Episode is split across multiple separate files.
     # Sonarr: "Single episode split into multiple files"
     - match: SPLIT_EPISODE
-      action: none
+      action: removeAndBlocklist
 
     # Anime episode is missing its absolute episode number.
     # Sonarr: "Episode does not have an absolute episode number and recently aired"
@@ -841,19 +848,21 @@ queueCleanupRules:
       action: remove
 
     # Not enough disk space to import the file.
+    # Keep this rule set to none because removing or blocklisting a release does not restore disk space.
     # Lidarr: "Not enough free space"
     - match: INSUFFICIENT_FREE_SPACE
-      action: removeAndBlocklist
+      action: none
 
     # File is still being extracted/unraring.
+    # Keep this rule set to none so the arr can retry after extraction finishes.
     # Lidarr: "File is still being unpacked"
     - match: FILE_UNPACKING
-      action: remove
+      action: none
 
     # This release has fewer tracks than the existing one.
     # Lidarr: "Has fewer tracks than existing release"
     - match: FEWER_TRACKS
-      action: remove
+      action: removeAndBlocklist
 
     # Some tracks in the release don't match any expected tracks.
     # Lidarr: "Has unmatched tracks"
@@ -873,12 +882,13 @@ queueCleanupRules:
     # Your existing track file already contains more tracks.
     # Lidarr: "Track file on disk contains more tracks than this file contains"
     - match: EXISTING_FILE_MORE_TRACKS
-      action: remove
+      action: removeAndBlocklist
 
     # The destination folder is not a configured root folder.
+    # Keep this rule set to none because this is a Lidarr configuration problem, not a bad release.
     # Lidarr: "Destination folder {pathToCheck} is not in a Root Folder"
     - match: DEST_FOLDER_NOT_ROOT
-      action: removeAndBlocklist
+      action: none
 
     # Album metadata doesn't match closely enough to any known album.
     # Lidarr: "Album match is not close enough"
@@ -908,7 +918,7 @@ queueCleanupRules:
     # Couldn't identify what artist/album this file is.
     # Lidarr: "Unable to parse file"
     - match: UNABLE_TO_PARSE
-      action: none
+      action: removeAndBlocklist
 
     # Something went wrong during import processing.
     # Lidarr: "Unexpected error processing file"
@@ -923,12 +933,12 @@ queueCleanupRules:
     # File type is not a supported audio format.
     # Lidarr: "Invalid audio file, unsupported extension: '{extension}'"
     - match: UNSUPPORTED_EXTENSION
-      action: none
+      action: removeAndBlocklist
 
     # Potentially harmful executable file found in download.
     # Lidarr: "Caution: Found executable file"
     - match: DANGEROUS_FILE
-      action: none
+      action: removeAndBlocklist
 
     # Download client is reporting a generic error — investigate the download client.
     # Lidarr: "qBittorrent is reporting an error", "Deluge is reporting an error", "uTorrent is reporting an error"
@@ -1026,19 +1036,21 @@ queueCleanupRules:
       action: removeAndBlocklist
 
     # Not enough disk space to import the file.
+    # Keep this rule set to none because removing or blocklisting a release does not restore disk space.
     # Whisparr: "Not enough free space"
     - match: INSUFFICIENT_FREE_SPACE
-      action: removeAndBlocklist
+      action: none
 
     # File is still being extracted/unraring.
+    # Keep this rule set to none so the arr can retry after extraction finishes.
     # Whisparr: "File is still being unpacked"
     - match: FILE_UNPACKING
-      action: remove
+      action: none
 
     # Couldn't identify what show this file is.
     # Whisparr: "Unable to parse file"
     - match: UNABLE_TO_PARSE
-      action: none
+      action: removeAndBlocklist
 
     # Something went wrong during import processing.
     # Whisparr: "Unexpected error processing file"
@@ -1053,14 +1065,14 @@ queueCleanupRules:
     # File type is not a supported video format.
     # Whisparr: "Invalid video file, unsupported extension: '{0}'"
     - match: UNSUPPORTED_EXTENSION
-      action: none
+      action: removeAndBlocklist
 
     # Potentially harmful executable file found in download.
     # Whisparr: "Caution: Found executable file"
     # Whisparr Eros: "Caution: Found executable file with extension: '{extension}'"
     # Whisparr Eros: "Caution: Found potentially dangerous file with extension: {extension}"
     - match: DANGEROUS_FILE
-      action: none
+      action: removeAndBlocklist
 
     # Download client is reporting a generic error — investigate the download client.
     # Whisparr: "qBittorrent is reporting an error", "Deluge is reporting an error", "uTorrent is reporting an error"
@@ -1086,12 +1098,12 @@ queueCleanupRules:
     # File on disk already has more episodes than this one.
     # Whisparr: "Episode file on disk contains more episodes than this file contains"
     - match: EXISTING_FILE_MORE_EPISODES
-      action: none
+      action: removeAndBlocklist
 
     # Episode is split across multiple separate files.
     # Whisparr: "Single episode split into multiple files"
     - match: SPLIT_EPISODE
-      action: none
+      action: removeAndBlocklist
 
     # Anime episode is missing its absolute episode number.
     # Whisparr: "Episode does not have an absolute episode number and recently aired"

@@ -96,6 +96,11 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 		"https://github.com/neurekadev/warrden",
 		"actions/workflows/CI.yaml",
 		"Download [`compose.yaml`](./compose.yaml) and [`.env.example`](./.env.example).",
+		"## Usage",
+		"Queue cleanup defaults to aggressive automation",
+		"`SAMPLE_INDETERMINATE` stays inactive",
+		"Local media is significantly less risky",
+		"set this matcher to `removeAndBlocklist`",
 		"> [!CAUTION]",
 		"Images at `registry.neureka.dev/warrden/warrden` are no longer updated. Use `ghcr.io/neurekadev/warrden`.",
 	} {
@@ -103,7 +108,7 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 			t.Errorf("README.md missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"code.neureka.dev", "NeurekaSoftware/wArrden", "official GitLab repository"} {
+	for _, forbidden := range []string{"code.neureka.dev", "NeurekaSoftware/wArrden", "official GitLab repository", "config.example.yaml` file can look overwhelming"} {
 		if strings.Contains(readme, forbidden) {
 			t.Errorf("README.md contains retired repository reference %q", forbidden)
 		}
@@ -119,6 +124,20 @@ func TestDeliveryFilesStayAlignedWithGoRuntime(t *testing.T) {
 	}
 	if lastSection != "## Why Use wArrden?" {
 		t.Errorf("README.md final section=%q, want %q", lastSection, "## Why Use wArrden?")
+	}
+
+	agentInstructions := string(readRepositoryFile(t, "../../AGENTS.md"))
+	for _, want := range []string{
+		"### Queue Cleanup Default Policy",
+		"Bad or unsuitable releases default to `removeAndBlocklist`.",
+		"Valid but redundant releases default to `remove`",
+		"Recoverable environment or metadata conditions default to `none`",
+		"All other applicable matcher keys default to `removeAndBlocklist`.",
+		"`SAMPLE_INDETERMINATE` must remain `none` unless an explicit policy decision changes it.",
+	} {
+		if !strings.Contains(agentInstructions, want) {
+			t.Errorf("AGENTS.md missing %q", want)
+		}
 	}
 
 	changelog := string(readRepositoryFile(t, "../../CHANGELOG.md"))
@@ -327,5 +346,5 @@ func readRepositoryFile(t *testing.T, path string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return data
+	return []byte(strings.ReplaceAll(string(data), "\r\n", "\n"))
 }
